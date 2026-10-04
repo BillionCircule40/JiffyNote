@@ -26,33 +26,72 @@
 
 **Priority:** High
 **Estimated Time:** 2-3 hours
+**Status:** ✅ COMPLETED
 
 #### Tasks:
 1. **Create Dark Mode Theme System**
-   - [ ] Design theme context using React Context API
-   - [ ] Implement theme state management (light/dark)
-   - [ ] Create theme variables (CSS custom properties)
+   - [x] Design theme context using React Context API
+   - [x] Implement theme state management (light/dark)
+   - [x] Create theme variables (CSS custom properties)
    - [ ] Implement theme transition animations
 
-2. **Add Theme Toggle Dropdown**
-   - [ ] Create dropdown component with theme options
-   - [ ] Add visual indicators for current theme
-   - [ ] Implement theme persistence (localStorage)
+2. **Add Theme Toggle**
+   - [x] Create simple toggle switch (no dropdown selector)
+   - [x] Add visual indicators for current theme (moon/sun icon)
+   - [x] Implement theme persistence (localStorage)
    - [ ] Add smooth theme switching
 
 3. **Integrate with Account Settings**
-   - [ ] Add "@" icon to top right of header
-   - [ ] Create dropdown menu for account settings
-   - [ ] Design settings modal/panel structure
+   - [x] Add "@" icon to top right of header
+   - [x] Create dropdown menu for account settings
+   - [x] Add theme toggle switch inside account dropdown
+   - [x] Design settings modal/panel structure
    - [ ] Plan future settings expansion (notifications, profile, etc.)
 
-**Files to Modify:**
-- `src/App.tsx` - Add theme provider
-- `src/App.css` - Add theme variables and styles
-- `src/calendar/Header.tsx` - Add "@" icon and dropdown
-- `src/components/ThemeToggle.tsx` - New component
-- `src/context/ThemeContext.tsx` - New context
+**Files Modified:**
+- `src/App.tsx` - Added ThemeProvider wrapper and account menu handler
+- `src/App.css` - Added theme variables and account menu styles
+- `src/calendar/Header.tsx` - Added "@" icon, integrated ThemeToggle into account dropdown
+- `src/components/ThemeToggle.tsx` - Simplified to single switch button
+- `src/context/ThemeContext.tsx` - Already implemented
 
+**Summary of Changes:**
+- Wrapped entire App component with ThemeProvider for theme context
+- Simplified ThemeToggle to a single button (no dropdown selector)
+- Moved theme toggle switch inside account dropdown menu
+- Account dropdown now shows current theme and allows toggling
+- Theme state persists in localStorage with system preference fallback
+- Click outside anywhere closes the account dropdown
+- Theme switch uses moon 🌙 icon for dark mode and sun ☀️ icon for light mode
+
+**Date:** 2026-10-04
+**Status:** ✅ COMPLETED
+
+#### Fixes Applied:
+1. **Dark Mode Not Working**
+   - Fixed: Added `document.documentElement.setAttribute('data-theme', theme)` to apply theme to document
+   - Theme variables now properly update when toggling between light and dark modes
+
+2. **Theme Toggle Switch**
+   - Replaced dropdown selector with a toggle switch inside the account dropdown
+   - Added visual switch indicator with thumb that moves left/right
+   - Switch uses CSS transitions for smooth animation
+
+3. **Account Menu Persistence**
+   - Account menu now stays open until clicking outside
+   - Clicking on the theme switch no longer closes the menu
+   - Other menu items still close the menu when clicked
+
+**Files Modified:**
+- `src/context/ThemeContext.tsx` - Added document attribute update for theme
+- `src/calendar/Header.tsx` - Changed theme toggle to switch with click stop propagation
+- `src/App.css` - Added theme-switch indicator styles
+
+**Summary of Changes:**
+- Dark mode now properly changes screen colors via CSS variables
+- Theme toggle is a visual switch with thumb indicator in account dropdown
+- Account menu persists until clicking outside (except for theme switch)
+- Smooth CSS transitions for theme switching
 ---
 
 ### Phase 2: Notes Section Tab

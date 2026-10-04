@@ -6,6 +6,7 @@ import MonthView from './calendar/MonthView';
 import EventModal from './calendar/EventModal';
 import { CalendarEvent, EventDraft, EVENT_COLORS, ViewMode } from './calendar/types';
 import { addDays, addMonths, startOfWeek } from './calendar/dateUtils';
+import { ThemeProvider } from './context/ThemeContext';
 
 const STORAGE_KEY = 'jiffynote.events';
 
@@ -79,61 +80,69 @@ const App: React.FC = () => {
     openNewEvent(start);
   };
 
+  const handleToggleAccountMenu = () => {
+    // Handle account menu toggle logic here
+    console.log('Account menu toggled');
+  };
+
   const visibleDays =
     view === 'day'
       ? [currentDate]
       : Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(currentDate), i));
 
   return (
-    <div className="app">
-      <Header
-        currentDate={currentDate}
-        view={view}
-        onToday={() => setCurrentDate(new Date())}
-        onPrev={() => navigate(-1)}
-        onNext={() => navigate(1)}
-        onViewChange={setView}
-        onToggleSidebar={() => setSidebarOpen((o) => !o)}
-      />
-      <div className="app-body">
-        {sidebarOpen && (
-          <Sidebar
-            selectedDate={currentDate}
-            onSelectDate={setCurrentDate}
-            onCreate={quickCreate}
-          />
-        )}
-        <main className="calendar-main">
-          {view === 'month' ? (
-            <MonthView
-              currentDate={currentDate}
-              events={events}
-              onDayClick={(day) => {
-                const start = new Date(day);
-                start.setHours(9, 0, 0, 0);
-                openNewEvent(start);
-              }}
-              onEventClick={openExistingEvent}
-            />
-          ) : (
-            <TimeGridView
-              days={visibleDays}
-              events={events}
-              onSlotClick={openNewEvent}
-              onEventClick={openExistingEvent}
+    <ThemeProvider>
+      <div className="app">
+        <Header
+          currentDate={currentDate}
+          view={view}
+          onToday={() => setCurrentDate(new Date())}
+          onPrev={() => navigate(-1)}
+          onNext={() => navigate(1)}
+          onViewChange={setView}
+          onToggleSidebar={() => setSidebarOpen((o) => !o)}
+          onToggleAccountMenu={handleToggleAccountMenu}
+        />
+        <div className="app-body">
+          {sidebarOpen && (
+            <Sidebar
+              selectedDate={currentDate}
+              onSelectDate={setCurrentDate}
+              onCreate={quickCreate}
             />
           )}
-        </main>
+          <main className="calendar-main">
+            {view === 'month' ? (
+              <MonthView
+                currentDate={currentDate}
+                events={events}
+                onDayClick={(day) => {
+                  const start = new Date(day);
+                  start.setHours(9, 0, 0, 0);
+                  openNewEvent(start);
+                }}
+                onEventClick={openExistingEvent}
+              />
+            ) : (
+              <TimeGridView
+                days={visibleDays}
+                events={events}
+                onSlotClick={openNewEvent}
+                onEventClick={openExistingEvent}
+              />
+            )}
+          </main>
+        </div>
+        {draft && (
+          <EventModal
+            draft={draft}
+            onSave={saveDraft}
+            onDelete={deleteEvent}
+            onClose={() => setDraft(null)}
+          />
+        )}
       </div>
-      {draft && (
-        <EventModal
-          draft={draft}
-          onSave={saveDraft}
-          onDelete={deleteEvent}
-          onClose={() => setDraft(null)}
-        />
-      )}
-    </div>
+    </ThemeProvider>
   );
 };
 
