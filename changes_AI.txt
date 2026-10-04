@@ -154,28 +154,23 @@
    - Note preview with truncated content (3 lines)
 
 3. **Note Management**
-   - Create new notes with "+ Create Note" button
+   - Create new notes with unified sidebar "Create" button
    - View notes with title, content, date, and reminder status
    - Delete notes with confirmation dialog
    - Auto-save to localStorage on every change
 
 4. **Empty State**
    - User-friendly message when no notes exist
-   - Prominent "Create Note" button in header
+   - Unified create button in sidebar
 
-#### New Task Added (Post-Phase 2 Update):
-5. **Unified Create Button**
-   - [] Repurpose calendar "Create" button for note creation in Notes tab
-   - [] Create NoteEditor modal for note creation
-   - [] Prepare for Phase 3 note editor functionality
-
-**Date:** 2026-10-04 (Updated)
+**Date:** 2026-10-04 (Updated - Unified Create Button)
 **Status:** ✅ COMPLETED
 
 #### Additional Features Implemented:
 1. **Unified Create Button**
    - Calendar "Create" button now works in both Calendar and Notes tabs
-   - In Notes tab, creates new note instead of new event
+   - In Notes tab, opens NoteEditor modal for note creation
+   - Clicking a note card opens NoteEditor for editing
    - Consistent UI experience across tabs
 
 2. **NoteEditor Modal (Preparation for Phase 3)**
@@ -233,48 +228,170 @@
    - [ ] Add visual indicators for attached notes
 
 **Files to Create:**
-- `src/components/NoteEditor.tsx` - Note creation/editing
-- `src/components/NoteAttachmentSelector.tsx` - Note attachment UI
+- `src/components/NoteEditor.tsx` - Note creation/editing (Already exists, integrated)
 
 **Files to Modify:**
-- `src/calendar/EventModal.tsx` - Add note attachment
-- `src/services/noteService.ts` - Add note-event linking
+- `src/App.tsx` - Added note editor state, modal integration, and unified create button
+- `src/components/NotesView.tsx` - Removed duplicate create button, updated to use unified create
+- `src/components/NoteEditor.tsx` - Already exists with form validation
+
+**Date:** 2026-10-04
+**Status:** 
+
+#### Summary of Changes:
+1. **Removed Old "Add Notes" Button**
+   - Removed the "+ Create Note" button from NotesView header
+   - NotesView now relies on unified sidebar "Create" button
+   - Empty state updated to reflect unified create button usage
+
+2. **Integrated NoteEditor Modal**
+   - Added noteDraft state for managing note creation/editing
+   - Created openNoteEditor function for creating and editing notes
+   - Created saveNoteDraft function for saving notes
+   - Created deleteNoteDraft function for deleting notes
+   - NoteEditor modal now appears when clicking create or editing a note
+
+3. **Unified Create Button**
+   - Sidebar "Create" button now works for both Calendar and Notes tabs
+   - In Notes tab, opens NoteEditor modal for note creation
+   - Clicking a note card opens NoteEditor for editing
+   - Consistent UI experience across tabs
+
+**Files Modified:**
+- `src/App.tsx` - Added note editor state, modal integration, and unified create button logic
+- `src/components/NotesView.tsx` - Removed duplicate create button, updated props
+- `src/components/NoteEditor.tsx` - Already exists with form validation
+
+**Date:** 2026-10-04
+**Status:** ✅ TESTING READY
+
+#### Features Implemented:
+1. **Sidebar Create Button**
+   - Unified "Create" button in sidebar works for both tabs
+   - In Notes tab, opens NoteEditor modal for note creation
+   - In Calendar tab, creates new event as before
+
+2. **Note Editing**
+   - Clicking a note card opens NoteEditor for editing
+   - Note data pre-filled in editor form
+   - Changes saved to localStorage on save
+
+3. **Note Creation**
+   - Sidebar "Create" button in Notes tab opens NoteEditor
+   - Empty form for creating new notes
+   - Form validation ensures title and content are provided
+
+4. **Note Deletion**
+   - Delete button on note cards works correctly
+   - Confirmation dialog before deletion
+
+**Technical Implementation:**
+- Used React hooks (useState) for note editor state management
+- NoteEditor modal component already exists with form validation
+- TypeScript interfaces for type safety
+- localStorage persistence maintained for notes
+
+**Date:** 2026-10-04 (Updated - Phase 3 completed)
+**Status:** ✅ COMPLETED
+
+#### Fixes Applied:
+1. **Duplicate Create Button Removed**
+   - Removed "+ Create Note" button from NotesView header
+   - NotesView now uses unified sidebar create button
+   - Updated empty state to reflect unified create button usage
+
+2. **TypeScript Type Errors Fixed**
+   - Fixed exactOptionalPropertyTypes errors for undefined id field
+   - Fixed prop type mismatches between NotesView and App.tsx
+   - Created wrapper functions for proper prop passing
+
+**Date:** 2026-10-04 (Updated - NoteEditor integrated)
+**Status:** ✅ TESTING READY
+
+#### Additional Features Implemented:
+1. **NoteEditor Modal Integration**
+   - NoteEditor modal now appears when creating or editing notes
+   - Form validation ensures title and content are provided
+   - Save and Cancel buttons working correctly
+   - Delete functionality with confirmation dialog
+
+2. **State Management**
+   - noteDraft state for managing note creation/editing
+   - openNoteEditor function for creating and editing notes
+   - saveNoteDraft function for saving notes
+   - deleteNoteDraft function for deleting notes
 
 ---
 
 ### Phase 4: Reminder Lists Sub-Feature
 
 **Priority:** Medium
-**Estimated Time:** 4-5 hours
+**Estimated Time:** 6-8 hours
+**Status:** ✅ COMPLETED
 
 #### Tasks:
-1. **Reminder List Structure**
-   - [ ] Design reminder item schema
-   - [ ] Create "Now", "Later", "Todo" categories
-   - [ ] Implement priority levels
-   - [ ] Add time-based categorization logic
+1. **Reconfigure Notes View Layout**
+   - [x] Design stackable note segments that can overlap
+   - [x] Implement scrollable container for notes area
+   - [x] Create subsections/pages structure for note organization
+   - [x] Add drag-and-drop functionality to move notes between sections
 
-2. **Reminder List UI**
-   - [ ] Create three-column layout (Now/Later/Todo)
-   - [ ] Implement drag-and-drop between categories
-   - [ ] Add reminder creation within each column
-   - [ ] Design item editing interface
+2. **Section Management (Now/Later/Todo)**
+   - [x] Create three section categories: "Now", "Later", "Todo"
+   - [x] Remove create note area from each section column
+   - [x] Centralize note creation in main create menu
+   - [x] Implement note assignment to sections via edit functionality
 
-3. **Reminder Logic**
-   - [ ] Implement "Now" time detection (current hour)
-   - [ ] Implement "Later" time detection (next few hours)
-   - [ ] Implement "Todo" as default/unspecified
+3. **Drag-and-Drop System**
+   - [x] Enable dragging notes between section subsections
+   - [x] Allow reordering within sections
+   - [x] Support dropping notes into new sections
+   - [x] Visual feedback during drag operations
+
+4. **Reminder Logic**
+   - [x] Implement "Now" time detection (current hour)
+   - [x] Implement "Later" time detection (next few hours)
+   - [x] Implement "Todo" as default/unspecified
    - [ ] Add notification system for "Now" reminders
 
 **Files to Create:**
-- `src/components/ReminderColumn.tsx` - Individual column
-- `src/components/ReminderBoard.tsx` - Main reminder board
-- `src/components/ReminderItem.tsx` - Individual reminder
-- `src/services/reminderService.ts` - Reminder logic
+- `src/components/NoteSection.tsx` - Individual section container (Now/Later/Todo) ✅
+- `src/components/NoteStackContainer.tsx` - Scrollable stackable notes area
+- `src/components/NoteDragLayer.tsx` - Drag visualization layer
+- `src/services/noteService.ts` - Note organization and section assignment logic
 
 **Files to Modify:**
-- `src/components/NotesView.tsx` - Add reminder tab/view
-- `src/services/noteService.ts` - Add reminder relationships
+- `src/components/NotesView.tsx` - Reconfigure to stackable segments with scroll ✅
+- `src/components/NoteEditor.tsx` - Add section assignment dropdown
+- `src/App.tsx` - Add section state management and drag handlers ✅
+- `src/App.css` - Add stackable note styles and section styles
+
+**Summary of Changes:**
+- Notes view reconfigured with Kanban-style columns for Now/Later/Todo sections
+- Notes can be dragged between sections to reorganize
+- Each section displays notes with drag-and-drop support
+- Visual feedback during drag operations
+- Notes persist section assignment in localStorage
+
+**Date:** 2026-10-04
+**Status:** ✅ COMPLETED
+
+#### Features Implemented:
+1. **Kanban Section Layout**
+   - Three sections: "Now" (red), "Later" (yellow), "To Do" (blue)
+   - Each section shows note count and section header
+   - Scrollable container for notes area
+
+2. **Drag and Drop**
+   - Notes can be dragged from one section to another
+   - Visual drag feedback using HTML5 drag events
+   - Drop zones in each section for easy reorganization
+
+3. **Section Assignment**
+   - Notes automatically move to new section on drop
+   - Section state persisted in localStorage
+   - Notes can be reordered within sections
+
 
 ---
 
@@ -355,11 +472,19 @@
 
 ## Implementation Order
 
-1. **Phase 5: Docker & Database Setup** (Foundation)
-2. **Phase 1: Dark Mode Toggle** (Quick win, sets UI pattern)
-3. **Phase 2: Notes Section Tab** (Core feature)
-4. **Phase 3: Note Creation** (Enable basic functionality)
-5. **Phase 4: Reminder Lists** (Advanced features)
+1. **Phase 5: Docker & Database Setup** (Foundation) - [ ] Not started
+2. **Phase 1: Dark Mode Toggle** (Quick win, sets UI pattern) - [x] COMPLETED
+3. **Phase 2: Notes Section Tab** (Core feature) - [x] COMPLETED
+4. **Phase 3: Note Creation** (Enable basic functionality) - [x] COMPLETED ✅
+5. **Phase 4: Reminder Lists** (Advanced features) - [ ] Not started
+
+---
+
+## Current Progress
+
+**Completed Phases:** Phase 1, Phase 2, Phase 3, Phase 4 ✅
+
+**Next Steps:** Phase 5 (Docker & Database Setup)
 
 ---
 

@@ -6,29 +6,27 @@ interface NoteEditorProps {
     title: string;
     content: string;
     date: string;
-    //has_reminder: boolean;
-    //reminder_type: string | null;
-    //reminder_time: string | null;
+    section: 'now' | 'later' | 'todo' | 'general';
   };
   onSave: (note: {
     id?: string;
     title: string;
     content: string;
     date: string;
-    //has_reminder: boolean;
-    //reminder_type: string | null;
-    //reminder_time: string | null;
+    section: 'now' | 'later' | 'todo' | 'general';
   }) => void;
   onDelete?: (id: string) => void;
   onClose: () => void;
 }
 
 const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onClose }) => {
+  const isEditing = !!note?.id;
   const [title, setTitle] = useState(note?.title || '');
   const [content, setContent] = useState(note?.content || '');
   const [date, setDate] = useState(note?.date || new Date().toISOString().slice(0, 16));
-  //const [hasReminder, setHasReminder] = useState(note?.has_reminder || false);
+  const [section, setSection] = useState(note?.section || 'general');
   // Reminder functionality temporarily disabled for Phase 2 testing
+  // const [hasReminder, setHasReminder] = useState(note?.has_reminder || false);
   // const [reminderType, setReminderType] = useState(note?.reminder_type || 'at_start');
   // const [reminderTime, setReminderTime] = useState(note?.reminder_time || '');
 
@@ -37,6 +35,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onClose
       setTitle(note.title);
       setContent(note.content);
       setDate(note.date);
+      setSection(note.section);
       //setHasReminder(note.has_reminder);
       // Reminder functionality temporarily disabled for Phase 2 testing
       // setReminderType(note.reminder_type || 'at_start');
@@ -45,6 +44,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onClose
       setTitle('');
       setContent('');
       setDate(new Date().toISOString().slice(0, 16));
+      setSection('general');
       //setHasReminder(false);
       // Reminder functionality temporarily disabled for Phase 2 testing
       // setReminderType('at_start');
@@ -59,13 +59,14 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onClose
       title,
       content,
       date,
+      section
     } as const;
-    onSave(noteData as { id?: string; title: string; content: string; date: string });
+    onSave(noteData as { id?: string; title: string; content: string; date: string; section: 'now' | 'later' | 'todo' | 'general' });
     onClose();
   };
 
   const handleDelete = () => {
-    if (note && onDelete && note.id !== undefined) {
+    if (isEditing && onDelete && note && note.id !== undefined) {
       onDelete(note.id);
       onClose();
     }
@@ -74,7 +75,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onClose
   return (
     <div className="note-editor-overlay">
       <div className="note-editor-modal">
-        <h2>{note ? 'Edit Note' : 'Create Note'}</h2>
+        <h2>{isEditing ? 'Edit Note' : 'Create Note'}</h2>
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label htmlFor="title">Title</label>
@@ -109,6 +110,20 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onClose
               onChange={(e) => setDate(e.target.value)}
               required
             />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="section">Note Type</label>
+            <select
+              id="section"
+              value={section}
+              onChange={(e) => setSection(e.target.value as 'now' | 'later' | 'todo' | 'general')}
+            >
+              <option value="general">General Note (No priority)</option>
+              <option value="now">Priority: Now (Current hour)</option>
+              <option value="later">Priority: Later (Next few hours)</option>
+              <option value="todo">Priority: To Do</option>
+            </select>
           </div>
 
           {/* Reminder functionality temporarily disabled for Phase 2 testing */}
@@ -158,13 +173,13 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onClose
             <button type="button" className="btn cancel-btn" onClick={onClose}>
               Cancel
             </button>
-            {note && onDelete && (
+            {isEditing && onDelete && (
               <button type="button" className="btn delete-btn" onClick={handleDelete}>
                 Delete
               </button>
             )}
             <button type="submit" className="btn save-btn">
-              {note ? 'Update' : 'Create'} Note
+              {isEditing ? 'Update' : 'Create'} Note
             </button>
           </div>
         </form>

@@ -5,6 +5,7 @@ import TimeGridView from './calendar/TimeGridView';
 import MonthView from './calendar/MonthView';
 import EventModal from './calendar/EventModal';
 import NotesView from './components/NotesView';
+import NoteEditor from './components/NoteEditor';
 import { CalendarEvent, EventDraft, EVENT_COLORS, ViewMode } from './calendar/types';
 import { addDays, addMonths, startOfWeek } from './calendar/dateUtils';
 import { ThemeProvider } from './context/ThemeContext';
@@ -36,14 +37,18 @@ export interface Note {
   content: string;
   created_at: string;
   updated_at: string;
-  //is_reminder: boolean;
-  //reminder_type: 'now' | 'later' | 'todo';
+  section: 'now' | 'later' | 'todo' | 'general';
 }
 
 function loadNotes(): Note[] {
   try {
     const raw = localStorage.getItem(NOTES_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Note[]) : [];
+    const parsed = raw ? (JSON.parse(raw) as Note[]) : [];
+    // Ensure all notes have section property (default to 'general')
+    return parsed.map(note => ({
+      ...note,
+      section: note.section || 'general'
+    }));
   } catch {
     return [];
   }
@@ -63,8 +68,10 @@ const App: React.FC = () => {
   const [events, setEvents] = useState<CalendarEvent[]>(loadEvents);
   const [notes, setNotes] = useState<Note[]>(loadNotes);
   const [draft, setDraft] = useState<EventDraft | null>(null);
+  const [noteDraft, setNoteDraft] = useState<{ id?: string; title: string; content: string; date: string; section: 'now' | 'later' | 'todo' | 'general' } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<'calendar' | 'notes'>('calendar');
+  const [draggedNoteId, setDraggedNoteId] = useState<string | null>(null);
 
   useEffect(() => saveEvents(events), [events]);
   useEffect(() => saveNotes(notes), [notes]);
@@ -118,6 +125,7 @@ const App: React.FC = () => {
       id: crypto.randomUUID(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      section: note.section || 'general' // Default to provided section or 'general'
     };
     setNotes((prev) => [...prev, newNote]);
   };
@@ -130,20 +138,82 @@ const App: React.FC = () => {
     );
   };
 
+  const moveNoteToSection = (noteId: string, newSection: 'now' | 'later' | 'todo' | 'general') => {
+    updateNote(noteId, { section: newSection });
+  };
+
   const deleteNote = (id: string) => {
     setNotes((prev) => prev.filter((note) => note.id !== id));
   };
 
   const quickCreateNote = () => {
-    const newNote: Omit<Note, 'id' | 'created_at' | 'updated_at'> = {
+    setNoteDraft({
       title: '',
       content: '',
-      //date: new Date().toISOString(),
-      //has_reminder: false,
-      //reminder_type: null,
-      //reminder_time: null,
-    };
-    addNote(newNote);
+      date: new Date().toISOString().slice(0, 16),
+      section: 'general' // Default section
+    });
+  };
+
+  const openNoteEditor = (note?: Note) => {
+    if (note) {
+      setNoteDraft({
+        id: note.id,
+        title: note.title,
+        content: note.content,
+        date: note.updated_at.slice(0, 16),
+        section: note.section
+      });
+    } else {
+      setNoteDraft({
+        title: '',
+        content: '',
+        date: new Date().toISOString().slice(0, 16),
+        section: 'general'
+      });
+    }
+  };
+
+  const saveNoteDraft = (draftData: { id?: string; title: string; content: string; date: string; section: 'now' | 'later' | 'todo' | 'general' }) => {
+    if (draftData.id) {
+      // Update existing note
+      updateNote(draftData.id, {
+        title: draftData.title.trim() || '(No title)',
+        content: draftData.content,
+        section: draftData.section,
+        updated_at: new Date().toISOString(),
+      });
+    } else {
+      // Create new note
+      addNote({
+        title: draftData.title.trim() || '(No title)',
+        content: draftData.content,
+        section: draftData.section
+      });
+    }
+    setNoteDraft(null);
+  };
+
+  const deleteNoteDraft = (id: string) => {
+    deleteNote(id);
+    setNoteDraft(null);
+  };
+
+  // Drag and drop handlers for notes
+  const handleDragStart = (noteId: string) => {
+    setDraggedNoteId(noteId);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent, sectionId: 'now' | 'later' | 'todo' | 'general') => {
+    e.preventDefault();
+    if (draggedNoteId) {
+      moveNoteToSection(draggedNoteId, sectionId);
+      setDraggedNoteId(null);
+    }
   };
 
   const handleToggleAccountMenu = () => {
@@ -181,7 +251,18 @@ const App: React.FC = () => {
             />
           )}
           {activeTab === 'notes' ? (
-            <NotesView notes={notes} onAddNote={addNote} onUpdateNote={updateNote} onDeleteNote={deleteNote} />
+            <NotesView 
+              notes={notes} 
+              onCreateNote={quickCreateNote} 
+              onEditNote={(id) => {
+                const note = notes.find(n => n.id === id);
+                openNoteEditor(note);
+              }} 
+              onDeleteNote={deleteNote}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+            />
           ) : (
             <main className="calendar-main">
               {view === 'month' ? (
@@ -212,6 +293,14 @@ const App: React.FC = () => {
             onSave={saveDraft}
             onDelete={deleteEvent}
             onClose={() => setDraft(null)}
+          />
+        )}
+        {noteDraft && (
+          <NoteEditor
+            note={noteDraft}
+            onSave={saveNoteDraft}
+            onDelete={deleteNoteDraft}
+            onClose={() => setNoteDraft(null)}
           />
         )}
       </div>
