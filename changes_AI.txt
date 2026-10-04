@@ -1,0 +1,270 @@
+# Software Design Document - JiffyNote Enhancement Plan
+
+## Project Overview
+**Project:** JiffyNote - Calendar Planner with Notes Management
+**Version:** 1.0.0
+**Date:** 2026-10-04
+
+## Technologies Stack
+
+### Frontend
+- **React 18.2.0** - UI framework
+- **TypeScript 4.9.5** - Type-safe development
+- **CSS3** - Styling and layout
+- **React DOM 18.2.0** - DOM rendering
+
+### Backend/Infrastructure
+- **PostgreSQL 8.23.0** - Database management
+- **Node.js** - Runtime environment
+- **Docker** - Containerization
+
+---
+
+## Task List
+
+### Phase 1: Dark Mode Toggle with Account Settings Dropdown
+
+**Priority:** High
+**Estimated Time:** 2-3 hours
+
+#### Tasks:
+1. **Create Dark Mode Theme System**
+   - [ ] Design theme context using React Context API
+   - [ ] Implement theme state management (light/dark)
+   - [ ] Create theme variables (CSS custom properties)
+   - [ ] Implement theme transition animations
+
+2. **Add Theme Toggle Dropdown**
+   - [ ] Create dropdown component with theme options
+   - [ ] Add visual indicators for current theme
+   - [ ] Implement theme persistence (localStorage)
+   - [ ] Add smooth theme switching
+
+3. **Integrate with Account Settings**
+   - [ ] Add "@" icon to top right of header
+   - [ ] Create dropdown menu for account settings
+   - [ ] Design settings modal/panel structure
+   - [ ] Plan future settings expansion (notifications, profile, etc.)
+
+**Files to Modify:**
+- `src/App.tsx` - Add theme provider
+- `src/App.css` - Add theme variables and styles
+- `src/calendar/Header.tsx` - Add "@" icon and dropdown
+- `src/components/ThemeToggle.tsx` - New component
+- `src/context/ThemeContext.tsx` - New context
+
+---
+
+### Phase 2: Notes Section Tab
+
+**Priority:** High
+**Estimated Time:** 4-5 hours
+
+#### Tasks:
+1. **Create Notes Tab in Sidebar**
+   - [ ] Add "Notes" tab to sidebar navigation
+   - [ ] Design notes list view layout
+   - [ ] Implement tab switching logic
+   - [ ] Add route/navigation state management
+
+2. **Build Notes List View**
+   - [ ] Create notes grid/card layout
+   - [ ] Implement notes filtering/search
+   - [ ] Add notes sorting options
+   - [ ] Create empty state UI
+
+3. **Create Notes Database Integration**
+   - [ ] Design notes table schema (see Phase 5)
+   - [ ] Implement CRUD operations for notes
+   - [ ] Add note metadata (created, modified, tags)
+   - [ ] Handle note synchronization
+
+**Files to Create:**
+- `src/components/NotesView.tsx` - Main notes view
+- `src/components/NoteCard.tsx` - Individual note display
+- `src/contexts/NotesContext.tsx` - Notes state management
+- `src/services/noteService.ts` - Note API calls
+
+**Files to Modify:**
+- `src/App.tsx` - Add notes view component
+- `src/Sidebar.tsx` - Add notes tab
+- `src/App.css` - Add notes view styles
+
+---
+
+### Phase 3: Note Creation Functionality
+
+**Priority:** High
+**Estimated Time:** 3-4 hours
+
+#### Tasks:
+1. **Create Note Editor**
+   - [ ] Build rich text editor (or simple textarea)
+   - [ ] Add title and content fields
+   - [ ] Implement auto-save functionality
+   - [ ] Add character/word count
+
+2. **Note Creation Modal/Panel**
+   - [ ] Design floating action button (FAB) or sidebar button
+   - [ ] Create note creation modal
+   - [ ] Implement form validation
+   - [ ] Add cancel and save buttons
+
+3. **Note Attachment to Calendar Events**
+   - [ ] Design attachment UI in EventModal
+   - [ ] Create note selection dropdown
+   - [ ] Implement note-event relationship
+   - [ ] Add visual indicators for attached notes
+
+**Files to Create:**
+- `src/components/NoteEditor.tsx` - Note creation/editing
+- `src/components/NoteAttachmentSelector.tsx` - Note attachment UI
+
+**Files to Modify:**
+- `src/calendar/EventModal.tsx` - Add note attachment
+- `src/services/noteService.ts` - Add note-event linking
+
+---
+
+### Phase 4: Reminder Lists Sub-Feature
+
+**Priority:** Medium
+**Estimated Time:** 4-5 hours
+
+#### Tasks:
+1. **Reminder List Structure**
+   - [ ] Design reminder item schema
+   - [ ] Create "Now", "Later", "Todo" categories
+   - [ ] Implement priority levels
+   - [ ] Add time-based categorization logic
+
+2. **Reminder List UI**
+   - [ ] Create three-column layout (Now/Later/Todo)
+   - [ ] Implement drag-and-drop between categories
+   - [ ] Add reminder creation within each column
+   - [ ] Design item editing interface
+
+3. **Reminder Logic**
+   - [ ] Implement "Now" time detection (current hour)
+   - [ ] Implement "Later" time detection (next few hours)
+   - [ ] Implement "Todo" as default/unspecified
+   - [ ] Add notification system for "Now" reminders
+
+**Files to Create:**
+- `src/components/ReminderColumn.tsx` - Individual column
+- `src/components/ReminderBoard.tsx` - Main reminder board
+- `src/components/ReminderItem.tsx` - Individual reminder
+- `src/services/reminderService.ts` - Reminder logic
+
+**Files to Modify:**
+- `src/components/NotesView.tsx` - Add reminder tab/view
+- `src/services/noteService.ts` - Add reminder relationships
+
+---
+
+### Phase 5: Docker & Database Setup
+
+**Priority:** High
+**Estimated Time:** 6-8 hours
+
+#### Tasks:
+1. **Docker Configuration**
+   - [ ] Create Dockerfile for application
+   - [ ] Create docker-compose.yml for PostgreSQL
+   - [ ] Configure environment variables
+   - [ ] Set up network configuration
+
+2. **Database Schema Design**
+   - [ ] **Users Table:**
+     - id (UUID, primary key)
+     - username (VARCHAR, unique)
+     - email (VARCHAR, unique)
+     - password_hash (VARCHAR)
+     - created_at (TIMESTAMP)
+     - updated_at (TIMESTAMP)
+   
+   - [ ] **Calendar Events Table:**
+     - id (UUID, primary key)
+     - user_id (UUID, foreign key)
+     - title (VARCHAR)
+     - description (TEXT)
+     - start_time (TIMESTAMP)
+     - end_time (TIMESTAMP)
+     - color (VARCHAR)
+     - created_at (TIMESTAMP)
+     - updated_at (TIMESTAMP)
+   
+   - [ ] **Notes Table:**
+     - id (UUID, primary key)
+     - user_id (UUID, foreign key)
+     - title (VARCHAR)
+     - content (TEXT)
+     - created_at (TIMESTAMP)
+     - updated_at (TIMESTAMP)
+     - is_reminder (BOOLEAN)
+     - reminder_type (VARCHAR: 'now', 'later', 'todo')
+   
+   - [ ] **Event-Note Attachments Table:**
+     - id (UUID, primary key)
+     - event_id (UUID, foreign key)
+     - note_id (UUID, foreign key)
+     - created_at (TIMESTAMP)
+
+3. **Database Migration Scripts**
+   - [ ] Create initial schema migration
+   - [ ] Add seed data for testing
+   - [ ] Create indexes for performance
+   - [ ] Add constraints and relationships
+
+4. **Application Database Integration**
+   - [ ] Replace localStorage with database queries
+   - [ ] Implement user authentication
+   - [ ] Add data synchronization logic
+   - [ ] Handle offline scenarios
+
+**Files to Create:**
+- `Dockerfile` - Application container
+- `docker-compose.yml` - Multi-container setup
+- `database/migrations/` - Migration scripts
+- `database/seed/` - Seed data scripts
+- `src/services/databaseService.ts` - DB connection management
+- `src/services/authService.ts` - Authentication logic
+
+**Files to Modify:**
+- `src/DataBase/DataBaseQueries.ts` - Complete implementation
+- `src/App.tsx` - Add authentication checks
+- `package.json` - Add Docker dependencies
+
+---
+
+## Implementation Order
+
+1. **Phase 5: Docker & Database Setup** (Foundation)
+2. **Phase 1: Dark Mode Toggle** (Quick win, sets UI pattern)
+3. **Phase 2: Notes Section Tab** (Core feature)
+4. **Phase 3: Note Creation** (Enable basic functionality)
+5. **Phase 4: Reminder Lists** (Advanced features)
+
+---
+
+## Notes for AI Assistant
+
+- All components should use TypeScript interfaces
+- Follow React best practices (hooks, context, components)
+- Ensure responsive design for all new features
+- Database operations should be async with proper error handling
+- User authentication is required before Phase 2+ features
+- Consider implementing optimistic UI updates for better UX
+- Add proper loading states for database operations
+- Ensure data persistence works across sessions
+
+---
+
+## Future Enhancements (Not in Current Scope)
+
+- Real-time collaboration on notes
+- Advanced calendar sharing features
+- Email notifications for reminders
+- Mobile app version
+- AI-powered event suggestions
+- Calendar analytics and insights
