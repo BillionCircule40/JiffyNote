@@ -4,11 +4,13 @@ import Sidebar from './calendar/Sidebar';
 import TimeGridView from './calendar/TimeGridView';
 import MonthView from './calendar/MonthView';
 import EventModal from './calendar/EventModal';
+import NotesView from './components/NotesView';
 import { CalendarEvent, EventDraft, EVENT_COLORS, ViewMode } from './calendar/types';
 import { addDays, addMonths, startOfWeek } from './calendar/dateUtils';
 import { ThemeProvider } from './context/ThemeContext';
 
 const STORAGE_KEY = 'jiffynote.events';
+const NOTES_STORAGE_KEY = 'jiffynote.notes';
 
 // Events live in the browser for now; swap these two for DataBaseQueries later.
 function loadEvents(): CalendarEvent[] {
@@ -28,14 +30,44 @@ function saveEvents(events: CalendarEvent[]): void {
   }
 }
 
+export interface Note {
+  id: string;
+  title: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  //is_reminder: boolean;
+  //reminder_type: 'now' | 'later' | 'todo';
+}
+
+function loadNotes(): Note[] {
+  try {
+    const raw = localStorage.getItem(NOTES_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as Note[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveNotes(notes: Note[]): void {
+  try {
+    localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notes));
+  } catch {
+    // storage unavailable (private mode etc.) - notes stay in memory only
+  }
+}
+
 const App: React.FC = () => {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [view, setView] = useState<ViewMode>('week');
   const [events, setEvents] = useState<CalendarEvent[]>(loadEvents);
+  const [notes, setNotes] = useState<Note[]>(loadNotes);
   const [draft, setDraft] = useState<EventDraft | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState<'calendar' | 'notes'>('calendar');
 
   useEffect(() => saveEvents(events), [events]);
+  useEffect(() => saveNotes(notes), [notes]);
 
   const navigate = (direction: -1 | 1) => {
     if (view === 'month') setCurrentDate(addMonths(currentDate, direction));
@@ -80,6 +112,40 @@ const App: React.FC = () => {
     openNewEvent(start);
   };
 
+  const addNote = (note: Omit<Note, 'id' | 'created_at' | 'updated_at'>) => {
+    const newNote: Note = {
+      ...note,
+      id: crypto.randomUUID(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    setNotes((prev) => [...prev, newNote]);
+  };
+
+  const updateNote = (id: string, updates: Partial<Note>) => {
+    setNotes((prev) =>
+      prev.map((note) =>
+        note.id === id ? { ...note, ...updates, updated_at: new Date().toISOString() } : note
+      )
+    );
+  };
+
+  const deleteNote = (id: string) => {
+    setNotes((prev) => prev.filter((note) => note.id !== id));
+  };
+
+  const quickCreateNote = () => {
+    const newNote: Omit<Note, 'id' | 'created_at' | 'updated_at'> = {
+      title: '',
+      content: '',
+      //date: new Date().toISOString(),
+      //has_reminder: false,
+      //reminder_type: null,
+      //reminder_time: null,
+    };
+    addNote(newNote);
+  };
+
   const handleToggleAccountMenu = () => {
     // Handle account menu toggle logic here
     console.log('Account menu toggled');
@@ -108,30 +174,37 @@ const App: React.FC = () => {
             <Sidebar
               selectedDate={currentDate}
               onSelectDate={setCurrentDate}
-              onCreate={quickCreate}
+              onCreateEvent={quickCreate}
+              onCreateNote={quickCreateNote}
+              onTabChange={setActiveTab}
+              activeTab={activeTab}
             />
           )}
-          <main className="calendar-main">
-            {view === 'month' ? (
-              <MonthView
-                currentDate={currentDate}
-                events={events}
-                onDayClick={(day) => {
-                  const start = new Date(day);
-                  start.setHours(9, 0, 0, 0);
-                  openNewEvent(start);
-                }}
-                onEventClick={openExistingEvent}
-              />
-            ) : (
-              <TimeGridView
-                days={visibleDays}
-                events={events}
-                onSlotClick={openNewEvent}
-                onEventClick={openExistingEvent}
-              />
-            )}
-          </main>
+          {activeTab === 'notes' ? (
+            <NotesView notes={notes} onAddNote={addNote} onUpdateNote={updateNote} onDeleteNote={deleteNote} />
+          ) : (
+            <main className="calendar-main">
+              {view === 'month' ? (
+                <MonthView
+                  currentDate={currentDate}
+                  events={events}
+                  onDayClick={(day) => {
+                    const start = new Date(day);
+                    start.setHours(9, 0, 0, 0);
+                    openNewEvent(start);
+                  }}
+                  onEventClick={openExistingEvent}
+                />
+              ) : (
+                <TimeGridView
+                  days={visibleDays}
+                  events={events}
+                  onSlotClick={openNewEvent}
+                  onEventClick={openExistingEvent}
+                />
+              )}
+            </main>
+          )}
         </div>
         {draft && (
           <EventModal
