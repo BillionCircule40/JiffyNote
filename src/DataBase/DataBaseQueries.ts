@@ -2,11 +2,11 @@ import { Client } from 'pg';
 
 // Database connection configuration
 const DB_CONFIG = {
-  host: 'localhost',
-  port: 5432,
-  database: 'jiffynote_db',
-  user: 'jiffynote_user',
-  password: 'secure_password'
+  host: process.env.POSTGRES_HOST || 'localhost',
+  port: parseInt(process.env.POSTGRES_PORT || '5432'),
+  database: process.env.POSTGRES_DB || 'jiffynote_db',
+  user: process.env.POSTGRES_USER || 'jiffynote_user',
+  password: process.env.POSTGRES_PASSWORD || 'secure_password'
 };
 
 // Database connection instance

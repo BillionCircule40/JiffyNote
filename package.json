@@ -7,16 +7,23 @@
     "test": "test"
   },
   "dependencies": {
+    "bcrypt": "^5.1.1",
     "pg": "^8.23.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-scripts": "^5.0.1",
-    "typescript": "^4.9.5"
+    "typescript": "^4.9.5",
+    "uuid": "^9.0.1"
+  },
+  "overrides": {
+    "tar": "^7.5.20"
   },
   "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
     "@types/pg": "^8.23.1",
     "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0"
+    "@types/react-dom": "^18.2.0",
+    "@types/uuid": "^9.0.8"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -35,5 +42,10 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "allowScripts": {
+    "bcrypt@5.1.1": true,
+    "core-js@3.50.0": true,
+    "core-js-pure@3.50.0": true
   }
 }
