@@ -43,10 +43,6 @@ const NotesView: React.FC<NotesViewProps> = ({
   const [priorityNotesExpanded, setPriorityNotesExpanded] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Get notes for a specific section
-  const getSectionNotes = (sectionId: string) => {
-    return notes.filter(note => note.section === sectionId);
-  };
 
   // Handle delete for general notes (inline)
   const handleDeleteNote = (id: string) => {
@@ -73,8 +69,21 @@ const NotesView: React.FC<NotesViewProps> = ({
     total: filteredNotes.length
   };
 
+  // Get notes for a specific section (respecting the search box)
+  const getSectionNotes = (sectionId: string) => {
+    return filteredNotes.filter(note => note.section === sectionId);
+  };
+
   return (
     <div className="notes-view kanban-view">
+      <input
+        type="search"
+        className="notes-search"
+        placeholder="Search notes"
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+      />
+
       {/* Section Filter Controls */}
       <div className="section-filters">
         <button 
@@ -147,8 +156,7 @@ const NotesView: React.FC<NotesViewProps> = ({
       <div className="general-notes-section">
         <h3 className="section-category-title">Notes</h3>
         <div className="general-notes-grid">
-          {notes
-            .filter(note => note.section === 'general')
+          {getSectionNotes('general')
             .map((note) => (
               <div
                 key={note.id}

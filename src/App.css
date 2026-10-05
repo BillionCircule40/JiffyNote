@@ -1130,3 +1130,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
   opacity: 1;
   transform: translateY(0);
 }
+
+/* ---------- Notes search ---------- */
+.notes-search {
+  width: 100%; max-width: 360px; margin-bottom: 12px; padding: 8px 14px;
+  border: 1px solid var(--border); border-radius: 20px;
+  background: var(--bg); color: var(--text); font: inherit; font-size: 14px;
+}
+.notes-search:focus { outline: none; border-color: var(--blue); }
