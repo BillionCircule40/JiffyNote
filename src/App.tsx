@@ -72,6 +72,8 @@ const App: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<'calendar' | 'notes'>('calendar');
   const [draggedNoteId, setDraggedNoteId] = useState<string | null>(null);
+  const [draggedEventId, setDraggedEventId] = useState<string | null>(null);
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
 
   useEffect(() => saveEvents(events), [events]);
   useEffect(() => saveNotes(notes), [notes]);
@@ -221,6 +223,34 @@ const App: React.FC = () => {
     console.log('Account menu toggled');
   };
 
+  // Calendar event drag and drop handlers
+  const handleEventDragStart = (event: CalendarEvent) => {
+    setDraggedEventId(event.id);
+  };
+
+  const handleEventDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleEventDrop = (e: React.DragEvent, targetDate: Date, targetHour: number) => {
+    e.preventDefault();
+    if (draggedEventId) {
+      const eventToMove = events.find(ev => ev.id === draggedEventId);
+      if (eventToMove) {
+        const newStart = new Date(targetDate);
+        newStart.setHours(targetHour, eventToMove.start.slice(11, 13) as any, 0, 0);
+        const newEnd = new Date(newStart.getTime() + (eventToMove.end.getTime() - new Date(eventToMove.start).getTime()));
+        
+        setEvents(prev => prev.map(ev => 
+          ev.id === draggedEventId 
+            ? { ...ev, start: newStart.toISOString(), end: newEnd.toISOString() }
+            : ev
+        ));
+      }
+      setDraggedEventId(null);
+    }
+  };
+
   const visibleDays =
     view === 'day'
       ? [currentDate]
@@ -282,6 +312,9 @@ const App: React.FC = () => {
                   events={events}
                   onSlotClick={openNewEvent}
                   onEventClick={openExistingEvent}
+                  onEventDragStart={handleEventDragStart}
+                  onEventDragOver={handleEventDragOver}
+                  onEventDrop={handleEventDrop}
                 />
               )}
             </main>

@@ -55,10 +55,17 @@ const NotesView: React.FC<NotesViewProps> = ({
   const hasNotes = notes.length > 0;
 
   // Search functionality
-  const filteredNotes = notes.filter(note => 
-    note.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    note.content.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredNotes = notes.filter(note => {
+    // Search by title and content
+    const matchesText = note.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      note.content.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Search by date (if date is specified in format YYYY-MM-DD)
+    const matchesDate = searchQuery.match(/^\d{4}-\d{2}-\d{2}$/) ? 
+      note.updated_at.startsWith(searchQuery) : true;
+    
+    return matchesText && matchesDate;
+  });
 
   // Calculate note counts for each section (filtered)
   const noteCounts = {
@@ -79,7 +86,7 @@ const NotesView: React.FC<NotesViewProps> = ({
       <input
         type="search"
         className="notes-search"
-        placeholder="Search notes"
+        placeholder="Search notes (title, content, or date YYYY-MM-DD)"
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
       />
@@ -152,10 +159,14 @@ const NotesView: React.FC<NotesViewProps> = ({
         </div>
       </div>
       
-      {/* Notes Section */}
+      {/* General Notes Section */}
       <div className="general-notes-section">
         <h3 className="section-category-title">Notes</h3>
-        <div className="general-notes-grid">
+        <div 
+          className="general-notes-drop-zone"
+          onDragOver={onDragOver}
+          onDrop={(e) => onDrop(e, 'general')}
+        >
           {getSectionNotes('general')
             .map((note) => (
               <div

@@ -164,9 +164,22 @@ button { font: inherit; color: inherit; cursor: pointer; }
   position: absolute; left: 2px; right: 8px;
   padding: 2px 6px; border-radius: 4px;
   color: #fff; font-size: 12px; overflow: hidden; cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.event-block:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+.event-block.dragging {
+  opacity: 0.5;
+  transform: scale(1.05);
 }
 .event-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .event-time { font-size: 11px; opacity: .9; }
+
+.hour-cell.drag-over {
+  background: var(--blue-light);
+}
 
 .now-line { position: absolute; left: 0; right: 0; height: 2px; background: var(--red); pointer-events: none; }
 .now-line::before {
@@ -197,6 +210,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .month-day-num {
   align-self: center; padding: 2px 6px; margin-bottom: 2px;
   border-radius: 12px; font-size: 12px; font-weight: 500;
+}
+.month-cell.selected .month-day-num {
+  background: var(--blue);
+  color: #fff;
+}
+.month-cell.selected.muted .month-day-num {
+  opacity: 0.6;
 }
 .month-day-num.today { background: var(--blue); color: #fff; }
 
@@ -1047,6 +1067,94 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 
 .general-notes-grid .delete-note-btn:hover {
+  background: rgba(234, 67, 53, 0.15);
+}
+
+/* General notes drop zone for drag-and-drop */
+.general-notes-drop-zone {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  padding: 8px 0;
+  min-height: 100px;
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.general-notes-drop-zone.drag-over {
+  border-color: var(--blue);
+  background: var(--blue-light);
+}
+
+.general-notes-drop-zone .note-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  cursor: grab;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  position: relative;
+}
+
+.general-notes-drop-zone .note-card:hover {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.general-notes-drop-zone .note-card.priority-general {
+  border-left: 3px solid #5f27cd;
+}
+
+.general-notes-drop-zone .note-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 6px 0;
+  line-height: 1.4;
+}
+
+.general-notes-drop-zone .note-card-content {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.general-notes-drop-zone .note-card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.general-notes-drop-zone .note-card-date {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.general-notes-drop-zone .delete-note-btn {
+  font-size: 16px;
+  line-height: 1;
+  border: none;
+  background: transparent;
+  color: var(--red);
+  cursor: pointer;
+  padding: 4px 6px;
+  margin-left: 6px;
+  border-radius: 4px;
+  transition: background-color 0.15s;
+}
+
+.general-notes-drop-zone .delete-note-btn:hover {
   background: rgba(234, 67, 53, 0.15);
 }
 

@@ -501,6 +501,414 @@
 
 ---
 
+---
+
+### Phase 6: Notes and Calendar UI Enhancements
+
+**Priority:** High
+**Estimated Time:** 8-10 hours
+**Status:** 
+
+#### Tasks:
+1. **Note Drag-and-Drop Improvements**
+   - [ ] Enable dragging notes from priority tabs (Now/Later/Todo) back to general notes list
+   - [ ] Implement visual feedback during drag operations
+   - [ ] Support dropping notes into general notes area
+   - [ ] Maintain proper section tracking when notes are moved
+
+2. **Search Functionality Expansion**
+   - [ ] Add date-based search capability to notes search
+   - [ ] Update search to look at both note title AND content
+   - [ ] Implement search filters for date ranges
+   - [ ] Add search history display
+
+3. **Calendar Time/Date Drag-and-Drop**
+   - [ ] Implement click-and-drag functionality for calendar events
+   - [ ] Enable movement at 15-minute increments vertically (time changes)
+   - [ ] Enable horizontal movement across dates
+   - [ ] Update event information (date/time) on drop
+   - [ ] Visual feedback during drag operations
+
+4. **Calendar Day Selection Highlighting**
+   - [ ] Change text color of selected day numbers in week view
+   - [ ] Revert to normal color when another day is selected
+   - [ ] Keep current date color unchanged when selected
+   - [ ] Visual indicator for selected day state
+
+5. **Create Button Text Update**
+   - [ ] Change "Create Notes" text to just "Create" in notes section
+   - [ ] Ensure consistency across all create buttons
+
+**Files to Create:**
+- `src/components/NoteDragEnhancements.tsx` - Enhanced drag functionality
+- `src/services/searchService.ts` - Search logic for dates, title, content
+
+**Files to Modify:**
+- `src/components/NotesView.tsx` - Add general notes drop zone
+- `src/components/CalendarView.tsx` - Implement time/date drag-and-drop
+- `src/components/DayCalendar.tsx` - Add day selection highlighting
+- `src/App.tsx` - Add search state management and drag handlers
+- `src/App.css` - Add drag visual feedback and selection styles
+
+**Summary of Changes:**
+- Notes can be dragged from priority sections back to general notes list
+- Search functionality now includes date-based searching and full content matching
+- Calendar events can be dragged vertically (15-min increments) and horizontally (date changes)
+- Selected calendar days highlight their text color
+- Create buttons统一 show "Create" text across the application
+
+**Date:** 2026-10-07
+**Status:** 
+
+---
+
+### Phase 7: Event Creation and Note Attachment System
+
+**Priority:** High
+**Estimated Time:** 10-12 hours
+**Status:** 
+
+#### Tasks:
+1. **Event Creation Enhancements**
+   - [ ] Update event creation modal with new features
+   - [ ] Move time range to separate line from day selection
+   - [ ] Add repeating functionality with toggle slider
+   - [ ] Create collapsed repeating options section
+   - [ ] Enable repeat toggle to open/close repeating section
+   - [ ] Add day-of-week selection for repeats
+   - [ ] Add repeat frequency options (once a week, once a month, once a year)
+   - [ ] Add stop repeat options (forever, after X occurrences, on date)
+
+2. **Note Attachment System**
+   - [ ] Add note attachment section to event creation menu
+   - [ ] Create search/create note selector (two methods)
+   - [ ] Implement create note button (left) and search bar (right)
+   - [ ] Display all notes regardless of section below search
+   - [ ] Allow multiple notes per event
+   - [ ] Enforce one-note-per-event relationship (unless repeated)
+   - [ ] Display attached notes in event details view
+   - [ ] Enable clicking event name in notes to view event
+   - [ ] Show closest repeating event based on current date
+
+**Files to Create:**
+- `src/components/EventRepeatingOptions.tsx` - Repeating frequency selector
+- `src/components/NoteAttachmentSelector.tsx` - Search/create note selector
+- `src/components/EventNoteAttachmentList.tsx` - Display attached notes
+- `src/services/eventService.ts` - Event creation and repeating logic
+
+**Files to Modify:**
+- `src/components/EventModal.tsx` - Add repeating options and note attachment
+- `src/App.tsx` - Add note attachment state management
+- `src/App.css` - Add repeating section styles and attachment styles
+
+**Summary of Changes:**
+- Event creation modal has improved time/date layout
+- Repeating events with toggle slider and collapsed options
+- Day-of-week selection for weekly repeats
+- Frequency options (weekly/monthly/yearly)
+- Stop repeat options (forever/after X/on date)
+- Note attachment system with search/create functionality
+- Multiple notes per event with one-note-per-event constraint
+- Cross-linking between events and notes
+
+**Date:** 2026-10-07
+**Status:** 
+
+---
+
+### Phase 8: Planner Section and Calendar Integration
+
+**Priority:** Medium
+**Estimated Time:** 12-15 hours
+**Status:** 
+
+#### Tasks:
+1. **Planner Section Creation**
+   - [ ] Add new "Planner" section to left drawer
+   - [ ] Create planner view with day-of-week layout (no dates)
+   - [ ] Implement planner-specific create event modal
+   - [ ] Limit repeating to days of week only (base plan)
+   - [ ] Add plans list with scroll and search functionality
+   - [ ] Create new plan button (plus icon right of search bar)
+   - [ ] Add pin functionality (right-click menu)
+   - [ ] Implement plan tabs that list downward
+
+2. **Calendar Integration**
+   - [ ] Add "Join" button right of create button in planner
+   - [ ] Create join menu with plan-to-calendar options
+   - [ ] Add repeat options (every week, every other week, once a month, once a year)
+   - [ ] Enable plan joining to main calendar
+   - [ ] Keep plan in planner after joining
+   - [ ] Sync planner changes to calendar events
+   - [ ] Allow calendar event changes without affecting plan
+   - [ ] Keep calendar events if plan is deleted
+
+**Files to Create:**
+- `src/components/PlannerView.tsx` - Planner calendar view
+- `src/components/PlannerPlanManager.tsx` - Plan management
+- `src/components/PlannerPlanList.tsx` - Plans list with search
+- `src/components/PlannerCreateEvent.tsx` - Planner-specific event creation
+- `src/services/plannerService.ts` - Planner logic and sync
+
+**Files to Modify:**
+- `src/App.tsx` - Add planner state and navigation
+- `src/calendar/Sidebar.tsx` - Add planner tab
+- `src/App.css` - Add planner styles and plan list styles
+
+**Summary of Changes:**
+- New Planner section in sidebar
+- Planner view shows days of week without dates
+- Plan templates that can be joined to calendar
+- Join options with repeat frequency selection
+- Plan remains in planner after joining
+- Planner changes sync to calendar events
+- Calendar changes don't affect plan
+- Events persist if plan is deleted
+
+**Date:** 2026-10-07
+**Status:** 
+
+---
+
+### Phase 9: Priority-Based Event Filtering
+
+**Priority:** Medium
+**Estimated Time:** 4-6 hours
+**Status:** 
+
+#### Tasks:
+1. **Priority View Mode**
+   - [ ] Add sub-header to calendar with priority filter
+   - [ ] Implement slider bar for priority range (1-9)
+   - [ ] Add "!" indicator for priority view mode
+   - [ ] Create select buttons for priority range (1-9)
+   - [ ] Implement priority highlighting in calendar view
+   - [ ] Add visual indicators for filtered priorities
+
+2. **Calendar Edit/Create Integration**
+   - [ ] Add priority filter to event edit modal
+   - [ ] Add priority filter to event creation modal
+   - [ ] Implement priority selection in form
+   - [ ] Add priority display in event list
+
+**Files to Create:**
+- `src/components/PriorityFilter.tsx` - Priority slider and select buttons
+- `src/services/priorityService.ts` - Priority filtering logic
+
+**Files to Modify:**
+- `src/components/CalendarView.tsx` - Add priority filtering
+- `src/components/EventModal.tsx` - Add priority selection
+- `src/App.tsx` - Add priority state management
+- `src/App.css` - Add priority highlight styles
+
+**Summary of Changes:**
+- Priority filter sub-header in calendar
+- Slider bar for priority range (1-9)
+- Select buttons for each priority level
+- Priority highlighting in calendar view
+- Priority selection in event creation/edit
+- Visual indicators for filtered priorities
+
+**Date:** 2026-10-07
+**Status:** 
+
+---
+
+### Phase 10: User Authentication and Settings
+
+**Priority:** High
+**Estimated Time:** 8-10 hours
+**Status:** 
+
+#### Tasks:
+1. **Login and Sign-Up Pages**
+   - [ ] Create login page component
+   - [ ] Create sign-up page component
+   - [ ] Implement email uniqueness validation
+   - [ ] Implement password verification
+   - [ ] Add form validation
+   - [ ] Create error handling
+
+2. **Settings Area**
+   - [ ] Create settings page/component
+   - [ ] Move dark/light mode to settings
+   - [ ] Add user profile section
+   - [ ] Add notification settings
+   - [ ] Add data export/import options
+
+3. **Account Data Integration**
+   - [ ] Tie all app data to user accounts
+   - [ ] Create SQL tables for calendar events
+   - [ ] Create SQL tables for notes
+   - [ ] Create SQL tables for plans
+   - [ ] Create SQL tables for plan contents
+   - [ ] Implement data synchronization
+   - [ ] Handle offline scenarios
+
+**Files to Create:**
+- `src/pages/LoginPage.tsx` - Login page
+- `src/pages/SignUpPage.tsx` - Sign-up page
+- `src/pages/SettingsPage.tsx` - Settings page
+- `src/services/authService.ts` - Authentication logic
+- `src/services/settingsService.ts` - Settings management
+
+**Files to Modify:**
+- `src/App.tsx` - Add authentication checks and settings integration
+- `src/context/ThemeContext.tsx` - Move to settings
+- `src/App.css` - Add authentication and settings styles
+- `src/DataBase/DataBaseQueries.ts` - Complete user and data tables
+
+**Summary of Changes:**
+- Login page with email/password authentication
+- Sign-up page with email uniqueness validation
+- Settings page with dark/light mode toggle
+- All app data tied to user accounts
+- SQL tables for users, calendar events, notes, plans, plan contents
+- Data synchronization with offline support
+
+**Date:** 2026-10-07
+**Status:** 
+
+---
+
+### Phase 11: Docker & Database Setup
+
+**Priority:** High
+**Estimated Time:** 8-10 hours
+**Status:** 
+
+#### Tasks:
+1. **Docker Configuration**
+   - [ ] Create Dockerfile for application
+   - [ ] Create docker-compose.yml for PostgreSQL
+   - [ ] Configure environment variables
+   - [ ] Set up network configuration
+
+2. **Database Schema Design**
+   - [ ] **Users Table:**
+     - id (UUID, primary key)
+     - username (VARCHAR, unique)
+     - email (VARCHAR, unique)
+     - password_hash (VARCHAR)
+     - created_at (TIMESTAMP)
+     - updated_at (TIMESTAMP)
+   
+   - [ ] **Calendar Events Table:**
+     - id (UUID, primary key)
+     - user_id (UUID, foreign key)
+     - title (VARCHAR)
+     - description (TEXT)
+     - start_time (TIMESTAMP)
+     - end_time (TIMESTAMP)
+     - color (VARCHAR)
+     - priority (INTEGER)
+     - is_repeating (BOOLEAN)
+     - repeat_options (JSONB)
+     - created_at (TIMESTAMP)
+     - updated_at (TIMESTAMP)
+   
+   - [ ] **Notes Table:**
+     - id (UUID, primary key)
+     - user_id (UUID, foreign key)
+     - title (VARCHAR)
+     - content (TEXT)
+     - created_at (TIMESTAMP)
+     - updated_at (TIMESTAMP)
+     - is_reminder (BOOLEAN)
+     - reminder_type (VARCHAR: 'now', 'later', 'todo')
+     - section (VARCHAR: 'now', 'later', 'todo', 'general')
+   
+   - [ ] **Plans Table:**
+     - id (UUID, primary key)
+     - user_id (UUID, foreign key)
+     - name (VARCHAR)
+     - description (TEXT)
+     - is_pinned (BOOLEAN)
+     - created_at (TIMESTAMP)
+     - updated_at (TIMESTAMP)
+   
+   - [ ] **Plan Events Table:**
+     - id (UUID, primary key)
+     - plan_id (UUID, foreign key)
+     - title (VARCHAR)
+     - description (TEXT)
+     - day_of_week (INTEGER: 0-6)
+     - start_time (TIME)
+     - end_time (TIME)
+     - color (VARCHAR)
+     - created_at (TIMESTAMP)
+     - updated_at (TIMESTAMP)
+   
+   - [ ] **Event-Note Attachments Table:**
+     - id (UUID, primary key)
+     - event_id (UUID, foreign key)
+     - note_id (UUID, foreign key)
+     - created_at (TIMESTAMP)
+
+3. **Database Migration Scripts**
+   - [ ] Create initial schema migration
+   - [ ] Add seed data for testing
+   - [ ] Create indexes for performance
+   - [ ] Add constraints and relationships
+
+4. **Application Database Integration**
+   - [ ] Replace localStorage with database queries
+   - [ ] Implement user authentication
+   - [ ] Add data synchronization logic
+   - [ ] Handle offline scenarios
+
+**Files to Create:**
+- `Dockerfile` - Application container
+- `docker-compose.yml` - Multi-container setup
+- `database/migrations/` - Migration scripts
+- `database/seed/` - Seed data scripts
+- `src/services/databaseService.ts` - DB connection management
+- `src/services/authService.ts` - Authentication logic
+
+**Files to Modify:**
+- `src/DataBase/DataBaseQueries.ts` - Complete implementation
+- `src/App.tsx` - Add authentication checks
+- `package.json` - Add Docker dependencies
+
+---
+
+## Implementation Order
+
+1. **Phase 6: Notes and Calendar UI Enhancements** (Quick wins, UI improvements) - [ ] Not started
+2. **Phase 7: Event Creation and Note Attachment System** (Core feature) - [ ] Not started
+3. **Phase 9: Priority-Based Event Filtering** (Medium complexity) - [ ] Not started
+4. **Phase 8: Planner Section and Calendar Integration** (Complex feature) - [ ] Not started
+5. **Phase 10: User Authentication and Settings** (High priority, foundation) - [ ] Not started
+6. **Phase 5: Docker & Database Setup** (Foundation) - [ ] Not started
+7. **Phase 1-4: Previous phases** - [x] COMPLETED
+
+---
+
+## Current Progress
+
+**Completed Phases:** Phase 1, Phase 2, Phase 3, Phase 4 ✅
+
+**Next Steps:** Phase 6 (Notes and Calendar UI Enhancements)
+
+---
+
+## Notes for AI Assistant
+
+- All components should use TypeScript interfaces
+- Follow React best practices (hooks, context, components)
+- Ensure responsive design for all new features
+- Database operations should be async with proper error handling
+- User authentication is required before Phase 2+ features
+- Consider implementing optimistic UI updates for better UX
+- Add proper loading states for database operations
+- Ensure data persistence works across sessions
+- Drag-and-drop operations should have visual feedback
+- Search functionality should support multiple criteria
+- Planner system should sync with calendar but maintain independence
+- Priority filtering should work across all views
+- Authentication should use secure password hashing
+- All user data should be tied to accounts in SQL tables
+
 ## Future Enhancements (Not in Current Scope)
 
 - Real-time collaboration on notes

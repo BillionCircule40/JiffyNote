@@ -10,6 +10,9 @@ interface TimeGridViewProps {
   events: CalendarEvent[];
   onSlotClick: (start: Date) => void;
   onEventClick: (event: CalendarEvent) => void;
+  onEventDragStart?: (event: CalendarEvent) => void;
+  onEventDragOver?: (e: React.DragEvent) => void;
+  onEventDrop?: (e: React.DragEvent, targetDate: Date, targetHour: number) => void;
 }
 
 const TimeGridView: React.FC<TimeGridViewProps> = ({ days, events, onSlotClick, onEventClick }) => {
@@ -70,7 +73,20 @@ const TimeGridView: React.FC<TimeGridViewProps> = ({ days, events, onSlotClick, 
               onClick={(e) => handleColumnClick(day, e)}
             >
               {HOURS.map((h) => (
-                <div key={h} className="hour-cell" style={{ height: HOUR_HEIGHT }} />
+                <div 
+                  key={h} 
+                  className="hour-cell" 
+                  style={{ height: HOUR_HEIGHT }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    onEventDragOver?.(e);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    onEventDrop?.(e, day, h);
+                  }}
+                />
               ))}
 
               {dayEvents.map((ev) => {
@@ -82,10 +98,15 @@ const TimeGridView: React.FC<TimeGridViewProps> = ({ days, events, onSlotClick, 
                   <div
                     key={ev.id}
                     className="event-block"
+                    draggable
                     style={{
                       top: (startMin / 60) * HOUR_HEIGHT,
                       height: (duration / 60) * HOUR_HEIGHT - 2,
                       background: ev.color,
+                    }}
+                    onDragStart={(e) => {
+                      e.dataTransfer.effectAllowed = 'move';
+                      onEventDragStart?.(ev);
                     }}
                     onClick={(e) => {
                       e.stopPropagation();
