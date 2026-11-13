@@ -14,6 +14,10 @@ interface MonthViewProps {
 const MonthView: React.FC<MonthViewProps> = ({ currentDate, events, onDayClick, onEventClick }) => {
   const today = new Date();
 
+  const handleDayClick = (day: Date) => {
+    onDayClick(day);
+  };
+
   return (
     <div className="month-view">
       <div className="month-weekdays">
@@ -30,10 +34,10 @@ const MonthView: React.FC<MonthViewProps> = ({ currentDate, events, onDayClick, 
           return (
             <div
               key={day.toISOString()}
-              className={`month-cell${outside ? ' muted' : ''}`}
-              onClick={() => onDayClick(day)}
+              className={`month-cell${outside ? ' muted' : ''}${isSameDay(day, currentDate) ? ' selected' : ''}`}
+              onClick={() => handleDayClick(day)}
             >
-              <span className={`month-day-num${isSameDay(day, today) ? ' today' : ''}`}>
+              <span className={`month-day-num${isSameDay(day, today) ? ' today' : ''}${isSameDay(day, currentDate) ? ' selected' : ''}`}>
                 {day.getDate() === 1
                   ? day.toLocaleDateString([], { month: 'short', day: 'numeric' })
                   : day.getDate()}

@@ -35,7 +35,7 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedDate, onSelectDate, onCreateE
       </div>
 
       <button className="create-btn" onClick={activeTab === 'notes' ? onCreateNote : onCreateEvent}>
-        <span className="create-plus">+</span> {activeTab === 'notes' ? 'Create Note' : 'Create'}
+        <span className="create-plus">+</span> Create
       </button>
 
       {activeTab === 'calendar' && (
@@ -61,7 +61,6 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedDate, onSelectDate, onCreateE
               const classes = ['mini-cal-day'];
               if (day.getMonth() !== shownMonth.getMonth()) classes.push('muted');
               if (isSameDay(day, today)) classes.push('today');
-              else if (isSameDay(day, selectedDate)) classes.push('selected');
               return (
                 <button key={day.toISOString()} className={classes.join(' ')} onClick={() => onSelectDate(day)}>
                   {day.getDate()}

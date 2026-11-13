@@ -3,6 +3,7 @@ import Header from './calendar/Header';
 import Sidebar from './calendar/Sidebar';
 import TimeGridView from './calendar/TimeGridView';
 import MonthView from './calendar/MonthView';
+import YearView from './calendar/YearView';
 import EventModal from './calendar/EventModal';
 import NotesView from './components/NotesView';
 import NoteEditor from './components/NoteEditor';
@@ -72,12 +73,81 @@ const App: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<'calendar' | 'notes'>('calendar');
   const [draggedNoteId, setDraggedNoteId] = useState<string | null>(null);
+  const [draggedEventId, setDraggedEventId] = useState<string | null>(null);
 
   useEffect(() => saveEvents(events), [events]);
   useEffect(() => saveNotes(notes), [notes]);
 
+  // Drag and drop handlers for events
+  const handleEventDragStart = (eventId: string) => {
+    setDraggedEventId(eventId);
+  };
+
+  const handleEventDrop = (e: React.DragEvent, targetDate: Date, targetHour: number) => {
+    e.preventDefault();
+    if (draggedEventId) {
+      const event = events.find(ev => ev.id === draggedEventId);
+      if (event) {
+        const originalStart = new Date(event.start);
+        const originalEnd = new Date(event.end);
+        
+        // Calculate time difference
+        const newStart = new Date(targetDate);
+        newStart.setHours(targetHour, originalStart.getMinutes(), 0, 0);
+        
+        // Calculate duration in minutes
+        const durationMinutes = (originalEnd.getTime() - originalStart.getTime()) / 60000;
+        
+        // Calculate new end time maintaining duration
+        const newEnd = new Date(newStart.getTime() + durationMinutes * 60000);
+        
+        // Update event with new time
+        const updatedEvent = {
+          ...event,
+          start: newStart.toISOString(),
+          end: newEnd.toISOString()
+        };
+        
+        setEvents(prev => prev.map(ev => ev.id === draggedEventId ? updatedEvent : ev));
+      }
+      setDraggedEventId(null);
+    }
+  };
+
+  const handleEventHorizontalDrop = (e: React.DragEvent, targetDate: Date) => {
+    e.preventDefault();
+    if (draggedEventId) {
+      const event = events.find(ev => ev.id === draggedEventId);
+      if (event) {
+        const originalStart = new Date(event.start);
+        const originalEnd = new Date(event.end);
+        
+        // Get the time from the original event
+        const hours = originalStart.getHours();
+        const minutes = originalStart.getMinutes();
+        
+        // Create new dates with the target date but same time
+        const newStart = new Date(targetDate);
+        newStart.setHours(hours, minutes, 0, 0);
+        
+        const newEnd = new Date(newStart.getTime() + (originalEnd.getTime() - originalStart.getTime()));
+        
+        // Update event with new date
+        const updatedEvent = {
+          ...event,
+          start: newStart.toISOString(),
+          end: newEnd.toISOString()
+        };
+        
+        setEvents(prev => prev.map(ev => ev.id === draggedEventId ? updatedEvent : ev));
+      }
+      setDraggedEventId(null);
+    }
+  };
+
   const navigate = (direction: -1 | 1) => {
-    if (view === 'month') setCurrentDate(addMonths(currentDate, direction));
+    if (view === 'year') setCurrentDate(addMonths(currentDate, direction * 12));
+    else if (view === 'month') setCurrentDate(addMonths(currentDate, direction));
     else setCurrentDate(addDays(currentDate, direction * (view === 'week' ? 7 : 1)));
   };
 
@@ -265,14 +335,26 @@ const App: React.FC = () => {
             />
           ) : (
             <main className="calendar-main">
-              {view === 'month' ? (
+              {view === 'year' ? (
+                <YearView
+                  currentDate={currentDate}
+                  events={events}
+                  onMonthClick={(month: Date) => {
+                    setCurrentDate(month);
+                    setView('month');
+                  }}
+                  onDayClick={(day: Date) => {
+                    setCurrentDate(day);
+                    setView('day');
+                  }}
+                />
+              ) : view === 'month' ? (
                 <MonthView
                   currentDate={currentDate}
                   events={events}
                   onDayClick={(day) => {
-                    const start = new Date(day);
-                    start.setHours(9, 0, 0, 0);
-                    openNewEvent(start);
+                    setCurrentDate(day);
+                    setView('day');
                   }}
                   onEventClick={openExistingEvent}
                 />
@@ -282,6 +364,9 @@ const App: React.FC = () => {
                   events={events}
                   onSlotClick={openNewEvent}
                   onEventClick={openExistingEvent}
+                  onEventDragStart={handleEventDragStart}
+                  onEventDrop={handleEventDrop}
+                  onEventHorizontalDrop={handleEventHorizontalDrop}
                 />
               )}
             </main>

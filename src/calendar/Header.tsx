@@ -15,6 +15,9 @@ interface HeaderProps {
 }
 
 function headerTitle(date: Date, view: ViewMode): string {
+  if (view === 'year') {
+    return date.getFullYear().toString();
+  }
   if (view === 'day') {
     return date.toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' });
   }
@@ -85,15 +88,29 @@ const Header: React.FC<HeaderProps> = ({
         ›
       </button>
       <h1 className="header-title">{headerTitle(currentDate, view)}</h1>
-      <select
-        className="view-select"
-        value={view}
-        onChange={(e) => onViewChange(e.target.value as ViewMode)}
-      >
-        <option value="day">Day</option>
-        <option value="week">Week</option>
-        <option value="month">Month</option>
-      </select>
+      <div className="view-slider" role="group" aria-label="Calendar view">
+        <input
+          className="view-range"
+          type="range"
+          min={0}
+          max={3}
+          step={1}
+          value={(['day', 'week', 'month', 'year'] as ViewMode[]).indexOf(view)}
+          aria-label="Calendar view"
+          aria-valuetext={`${view[0]?.toUpperCase()}${view.slice(1)} view`}
+          onChange={(e) => {
+            const views: ViewMode[] = ['day', 'week', 'month', 'year'];
+            onViewChange(views[Number(e.target.value)] ?? 'week');
+          }}
+        />
+        <div className="view-range-labels" aria-hidden="true">
+          {(['day', 'week', 'month', 'year'] as ViewMode[]).map((viewOption) => (
+            <span className={view === viewOption ? 'active' : ''} key={viewOption}>
+              {viewOption[0]?.toUpperCase()}{viewOption.slice(1)}
+            </span>
+          ))}
+        </div>
+      </div>
       {/* Account Settings Dropdown */}
       <div className="account-menu-wrapper" ref={accountMenuRef}>
         <button
