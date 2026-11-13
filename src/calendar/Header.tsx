@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ViewMode } from './types';
 import { addDays, startOfWeek } from './dateUtils';
 import { useTheme } from '../context/ThemeContext';
+import { User } from '../services/authService';
+import PriorityFilter from '../components/PriorityFilter';
 
 interface HeaderProps {
   currentDate: Date;
@@ -12,6 +14,11 @@ interface HeaderProps {
   onViewChange: (view: ViewMode) => void;
   onToggleSidebar: () => void;
   onToggleAccountMenu: () => void;
+  priorityRange?: number[];
+  onPriorityRangeChange?: (selectedPriorities: number[]) => void;
+  currentUser?: User | null;
+  onOpenSettings: () => void;
+  onLogout: () => void;
 }
 
 function headerTitle(date: Date, view: ViewMode): string {
@@ -43,6 +50,11 @@ const Header: React.FC<HeaderProps> = ({
   onViewChange,
   onToggleSidebar,
   onToggleAccountMenu,
+  priorityRange = [1, 2, 3, 4, 5, 6, 7, 8, 9],
+  onPriorityRangeChange,
+  currentUser,
+  onOpenSettings,
+  onLogout,
 }) => {
   const { theme, toggleTheme } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
@@ -78,9 +90,17 @@ const Header: React.FC<HeaderProps> = ({
         <span className="logo-mark">{new Date().getDate()}</span>
         <span className="logo-text">JiffyNote</span>
       </div>
-      <button className="outline-btn" onClick={onToday}>
-        Today
-      </button>
+      <div className="header-controls-group">
+        {onPriorityRangeChange && (
+          <PriorityFilter
+            selectedPriorities={priorityRange}
+            onChange={onPriorityRangeChange}
+          />
+        )}
+        <button className="outline-btn" onClick={onToday}>
+          Today
+        </button>
+      </div>
       <button className="icon-btn" onClick={onPrev} aria-label="Previous">
         ‹
       </button>
@@ -123,8 +143,8 @@ const Header: React.FC<HeaderProps> = ({
         {isOpen && (
           <div className="account-menu-dropdown">
             <div className="account-menu-header">
-              <span className="account-name">User Account</span>
-              <span className="account-email">user@example.com</span>
+              <span className="account-name">{currentUser ? currentUser.username : 'Guest user'}</span>
+              <span className="account-email">{currentUser ? currentUser.email : 'Not signed in'}</span>
             </div>
             <div className="account-menu-separator"></div>
             <div className="account-menu-item theme-switch-container" onClick={handleThemeToggle}>
@@ -135,19 +155,42 @@ const Header: React.FC<HeaderProps> = ({
               </div>
             </div>
             <div className="account-menu-separator"></div>
-            <button className="account-menu-item">
-              <span className="menu-item-icon">👤</span>
-              <span className="menu-item-text">Profile</span>
-            </button>
-            <button className="account-menu-item">
+            <button
+              className="account-menu-item"
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                onOpenSettings();
+              }}
+            >
               <span className="menu-item-icon">⚙️</span>
               <span className="menu-item-text">Settings</span>
             </button>
-            <div className="account-menu-separator"></div>
-            <button className="account-menu-item">
-              <span className="menu-item-icon">_logout_</span>
-              <span className="menu-item-text">Logout</span>
-            </button>
+            {currentUser ? (
+              <button
+                className="account-menu-item"
+                type="button"
+                onClick={() => {
+                  setIsOpen(false);
+                  onLogout();
+                }}
+              >
+                <span className="menu-item-icon">_logout_</span>
+                <span className="menu-item-text">Logout</span>
+              </button>
+            ) : (
+              <button
+                className="account-menu-item"
+                type="button"
+                onClick={() => {
+                  setIsOpen(false);
+                  onOpenSettings();
+                }}
+              >
+                <span className="menu-item-icon">🔐</span>
+                <span className="menu-item-text">Login</span>
+              </button>
+            )}
           </div>
         )}
       </div>

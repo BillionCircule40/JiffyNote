@@ -7,18 +7,28 @@ import YearView from './calendar/YearView';
 import EventModal from './calendar/EventModal';
 import NotesView from './components/NotesView';
 import NoteEditor from './components/NoteEditor';
+import PlannerView, { type PlannerEvent, type PlannerPlan, type PlannerPlanDraft } from './components/PlannerView';
+import AuthPage from './pages/AuthPage';
+import SettingsPage from './pages/SettingsPage';
 import { CalendarEvent, EventDraft, EVENT_COLORS, ViewMode } from './calendar/types';
 import { addDays, addMonths, startOfWeek } from './calendar/dateUtils';
 import { ThemeProvider } from './context/ThemeContext';
+import authService, { User } from './services/authService';
+import { getDefaultRepeatSettings, resetPrioritySelection } from './services/eventService';
 
 const STORAGE_KEY = 'jiffynote.events';
 const NOTES_STORAGE_KEY = 'jiffynote.notes';
+const PLANNER_STORAGE_KEY = 'jiffynote.plans';
 
 // Events live in the browser for now; swap these two for DataBaseQueries later.
 function loadEvents(): CalendarEvent[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as CalendarEvent[]) : [];
+    const parsed = raw ? (JSON.parse(raw) as CalendarEvent[]) : [];
+    return parsed.map((event) => ({
+      ...event,
+      priority: typeof event.priority === 'number' ? event.priority : 5,
+    }));
   } catch {
     return [];
   }
@@ -63,20 +73,77 @@ function saveNotes(notes: Note[]): void {
   }
 }
 
+function loadPlans(): PlannerPlan[] {
+  try {
+    const raw = localStorage.getItem(PLANNER_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as PlannerPlan[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePlans(plans: PlannerPlan[]): void {
+  try {
+    localStorage.setItem(PLANNER_STORAGE_KEY, JSON.stringify(plans));
+  } catch {
+    // storage unavailable (private mode etc.) - plans stay in memory only
+  }
+}
+
 const App: React.FC = () => {
+  const [currentUser, setCurrentUser] = useState<User | null>(() => authService.getCurrentUser());
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [view, setView] = useState<ViewMode>('week');
   const [events, setEvents] = useState<CalendarEvent[]>(loadEvents);
   const [notes, setNotes] = useState<Note[]>(loadNotes);
+  const [plans, setPlans] = useState<PlannerPlan[]>(loadPlans);
   const [draft, setDraft] = useState<EventDraft | null>(null);
   const [noteDraft, setNoteDraft] = useState<{ id?: string; title: string; content: string; date: string; section: 'now' | 'later' | 'todo' | 'general' } | null>(null);
+  const [plannerDraft, setPlannerDraft] = useState<PlannerPlanDraft | null>(null);
+  const [selectedPlannerId, setSelectedPlannerId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState<'calendar' | 'notes'>('calendar');
+  const [activeTab, setActiveTab] = useState<'calendar' | 'notes' | 'planner'>('calendar');
   const [draggedNoteId, setDraggedNoteId] = useState<string | null>(null);
   const [draggedEventId, setDraggedEventId] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [priorityRange, setPriorityRange] = useState<number[]>(resetPrioritySelection());
+
+  useEffect(() => {
+    const savedUser = authService.getCurrentUser();
+    if (savedUser) {
+      setCurrentUser(savedUser);
+    }
+  }, []);
 
   useEffect(() => saveEvents(events), [events]);
   useEffect(() => saveNotes(notes), [notes]);
+  useEffect(() => savePlans(plans), [plans]);
+
+  useEffect(() => {
+    if (!plans.length) {
+      setSelectedPlannerId(null);
+      return;
+    }
+
+    const nextPlan = plans.find((plan) => plan.id === selectedPlannerId);
+    if (!selectedPlannerId || !nextPlan) {
+      const firstPlan = plans[0];
+      if (firstPlan) {
+        setSelectedPlannerId(firstPlan.id);
+      }
+    }
+  }, [plans, selectedPlannerId]);
+
+  const handleAuthenticated = (user: User) => {
+    setCurrentUser(user);
+    setSettingsOpen(false);
+  };
+
+  const handleLogout = () => {
+    authService.logout();
+    setCurrentUser(null);
+    setSettingsOpen(false);
+  };
 
   // Drag and drop handlers for events
   const handleEventDragStart = (eventId: string) => {
@@ -153,7 +220,15 @@ const App: React.FC = () => {
 
   const openNewEvent = (start: Date) => {
     const end = new Date(start.getTime() + 60 * 60 * 1000);
-    setDraft({ title: '', start, end, color: EVENT_COLORS[0] ?? '#039be5' });
+    setDraft({
+      title: '',
+      start,
+      end,
+      color: EVENT_COLORS[0] ?? '#039be5',
+      priority: 5,
+      repeat: getDefaultRepeatSettings(),
+      noteIds: [],
+    });
   };
 
   const openExistingEvent = (event: CalendarEvent) => {
@@ -163,6 +238,9 @@ const App: React.FC = () => {
       start: new Date(event.start),
       end: new Date(event.end),
       color: event.color,
+      priority: typeof event.priority === 'number' ? event.priority : 5,
+      repeat: event.repeat ?? getDefaultRepeatSettings(),
+      noteIds: event.noteIds ?? [],
     });
   };
 
@@ -173,6 +251,9 @@ const App: React.FC = () => {
       start: d.start.toISOString(),
       end: d.end.toISOString(),
       color: d.color,
+      priority: d.priority ?? 5,
+      repeat: d.repeat ?? getDefaultRepeatSettings(),
+      noteIds: d.noteIds ?? [],
     };
     setEvents((prev) => [...prev.filter((e) => e.id !== saved.id), saved]);
     setDraft(null);
@@ -269,6 +350,94 @@ const App: React.FC = () => {
     setNoteDraft(null);
   };
 
+  const openNewPlan = () => {
+    setPlannerDraft({
+      title: '',
+      description: '',
+      color: EVENT_COLORS[0] ?? '#039be5',
+    });
+  };
+
+  const savePlannerEvent = (event: PlannerEvent) => {
+    if (!selectedPlannerId) {
+      return;
+    }
+
+    setPlans((prev) =>
+      prev.map((item) =>
+        item.id === selectedPlannerId
+          ? {
+              ...item,
+              events: [
+                ...item.events.filter((existing) => existing.id !== event.id),
+                event,
+              ],
+            }
+          : item
+      )
+    );
+  };
+
+  const movePlannerEvent = (eventId: string, dayOfWeek: number) => {
+    if (!selectedPlannerId) {
+      return;
+    }
+
+    setPlans((prev) =>
+      prev.map((plan) => {
+        if (plan.id !== selectedPlannerId) {
+          return plan;
+        }
+
+        return {
+          ...plan,
+          events: plan.events.map((event) =>
+            event.id === eventId ? { ...event, dayOfWeek } : event
+          ),
+        };
+      })
+    );
+  };
+
+  const savePlannerDraft = (draftPlan: PlannerPlanDraft) => {
+    const nextPlan: PlannerPlan = {
+      id: draftPlan.id ?? crypto.randomUUID(),
+      title: draftPlan.title.trim() || 'Untitled Plan',
+      description: draftPlan.description.trim(),
+      color: draftPlan.color,
+      events: plans.find((plan) => plan.id === draftPlan.id)?.events ?? [],
+    };
+
+    setPlans((prev) => {
+      const existing = prev.filter((plan) => plan.id !== nextPlan.id);
+      return [...existing, nextPlan];
+    });
+    setSelectedPlannerId(nextPlan.id);
+    setPlannerDraft(null);
+  };
+
+  const deletePlannerPlan = (id: string) => {
+    setPlans((prev) => prev.filter((plan) => plan.id !== id));
+    if (selectedPlannerId === id) {
+      setSelectedPlannerId(null);
+    }
+    setPlannerDraft(null);
+  };
+
+  const deletePlannerEvent = (id: string) => {
+    if (!selectedPlannerId) {
+      return;
+    }
+
+    setPlans((prev) =>
+      prev.map((plan) =>
+        plan.id === selectedPlannerId
+          ? { ...plan, events: plan.events.filter((event) => event.id !== id) }
+          : plan
+      )
+    );
+  };
+
   // Drag and drop handlers for notes
   const handleDragStart = (noteId: string) => {
     setDraggedNoteId(noteId);
@@ -296,6 +465,19 @@ const App: React.FC = () => {
       ? [currentDate]
       : Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(currentDate), i));
 
+  const visibleEvents = events.filter((event) => {
+    const priority = typeof event.priority === 'number' ? event.priority : 5;
+    return priorityRange.includes(priority);
+  });
+
+  if (!currentUser) {
+    return (
+      <ThemeProvider>
+        <AuthPage onAuthenticated={handleAuthenticated} />
+      </ThemeProvider>
+    );
+  }
+
   return (
     <ThemeProvider>
       <div className="app">
@@ -308,6 +490,11 @@ const App: React.FC = () => {
           onViewChange={setView}
           onToggleSidebar={() => setSidebarOpen((o) => !o)}
           onToggleAccountMenu={handleToggleAccountMenu}
+          priorityRange={priorityRange}
+          onPriorityRangeChange={setPriorityRange}
+          currentUser={currentUser}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onLogout={handleLogout}
         />
         <div className="app-body">
           {sidebarOpen && (
@@ -316,6 +503,7 @@ const App: React.FC = () => {
               onSelectDate={setCurrentDate}
               onCreateEvent={quickCreate}
               onCreateNote={quickCreateNote}
+              onCreatePlanner={openNewPlan}
               onTabChange={setActiveTab}
               activeTab={activeTab}
             />
@@ -329,16 +517,37 @@ const App: React.FC = () => {
                 openNoteEditor(note);
               }} 
               onDeleteNote={deleteNote}
+              onAttachNote={(noteId) => {
+                if (!draft) {
+                  return;
+                }
+
+                setDraft((current) => current ? {
+                  ...current,
+                  noteIds: [...new Set([...(current.noteIds ?? []), noteId])],
+                } : current);
+              }}
               onDragStart={handleDragStart}
               onDragOver={handleDragOver}
               onDrop={handleDrop}
+            />
+          ) : activeTab === 'planner' ? (
+            <PlannerView
+              plans={plans}
+              selectedPlanId={selectedPlannerId}
+              onSelectPlan={setSelectedPlannerId}
+              onSaveEvent={savePlannerEvent}
+              onSavePlan={() => savePlans(plans)}
+              onDeletePlan={deletePlannerPlan}
+              onDeleteEvent={deletePlannerEvent}
+              onMoveEvent={movePlannerEvent}
             />
           ) : (
             <main className="calendar-main">
               {view === 'year' ? (
                 <YearView
                   currentDate={currentDate}
-                  events={events}
+                  events={visibleEvents}
                   onMonthClick={(month: Date) => {
                     setCurrentDate(month);
                     setView('month');
@@ -351,7 +560,7 @@ const App: React.FC = () => {
               ) : view === 'month' ? (
                 <MonthView
                   currentDate={currentDate}
-                  events={events}
+                  events={visibleEvents}
                   onDayClick={(day) => {
                     setCurrentDate(day);
                     setView('day');
@@ -361,7 +570,7 @@ const App: React.FC = () => {
               ) : (
                 <TimeGridView
                   days={visibleDays}
-                  events={events}
+                  events={visibleEvents}
                   onSlotClick={openNewEvent}
                   onEventClick={openExistingEvent}
                   onEventDragStart={handleEventDragStart}
@@ -375,6 +584,7 @@ const App: React.FC = () => {
         {draft && (
           <EventModal
             draft={draft}
+            availableNotes={notes}
             onSave={saveDraft}
             onDelete={deleteEvent}
             onClose={() => setDraft(null)}
@@ -387,6 +597,73 @@ const App: React.FC = () => {
             onDelete={deleteNoteDraft}
             onClose={() => setNoteDraft(null)}
           />
+        )}
+        {settingsOpen && (
+          <SettingsPage
+            currentUser={currentUser}
+            onClose={() => setSettingsOpen(false)}
+            onLogout={handleLogout}
+          />
+        )}
+        {plannerDraft && (
+          <div className="planner-modal-backdrop" onClick={() => setPlannerDraft(null)}>
+            <div className="planner-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="planner-modal-header">
+                <h2>{plannerDraft.id ? 'Edit plan' : 'Create plan'}</h2>
+                <button type="button" className="planner-close-btn" onClick={() => setPlannerDraft(null)}>
+                  ×
+                </button>
+              </div>
+
+              <div className="planner-form-grid">
+                <label>
+                  <span>Title</span>
+                  <input
+                    value={plannerDraft.title}
+                    onChange={(event) => setPlannerDraft({ ...plannerDraft, title: event.target.value })}
+                  />
+                </label>
+
+                <label>
+                  <span>Color</span>
+                  <input
+                    type="color"
+                    value={plannerDraft.color}
+                    onChange={(event) => setPlannerDraft({ ...plannerDraft, color: event.target.value })}
+                  />
+                </label>
+
+                <label className="planner-full-width">
+                  <span>Description</span>
+                  <textarea
+                    rows={3}
+                    value={plannerDraft.description}
+                    onChange={(event) => setPlannerDraft({ ...plannerDraft, description: event.target.value })}
+                  />
+                </label>
+              </div>
+
+              <div className="planner-actions-row">
+                <div className="planner-modal-buttons">
+                  {plannerDraft.id && (
+                    <button
+                      type="button"
+                      className="planner-delete-btn"
+                      onClick={() => deletePlannerPlan(plannerDraft.id!)}
+                    >
+                      Delete
+                    </button>
+                  )}
+                  <button type="button" className="outline-btn" onClick={() => setPlannerDraft(null)}>
+                    Cancel
+                  </button>
+                  <button type="button" className="create-btn" onClick={() => savePlannerDraft(plannerDraft)}>
+                    Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </ThemeProvider>

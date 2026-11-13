@@ -1,10 +1,3 @@
-import bcrypt from 'bcrypt';
-import databaseService from './databaseService';
-
-// Password configuration
-const SALT_ROUNDS = 10;
-
-// User interfaces
 export interface User {
   id: string;
   username: string;
@@ -29,182 +22,185 @@ export interface AuthResult {
   error?: string;
 }
 
-// Authentication service class
+interface StoredUser extends User {
+  passwordHash: string;
+}
+
+const USERS_KEY = 'jiffynote.auth.users';
+const CURRENT_USER_KEY = 'jiffynote.auth.currentUser';
+
+const readStoredUsers = (): StoredUser[] => {
+  try {
+    const raw = localStorage.getItem(USERS_KEY);
+    return raw ? (JSON.parse(raw) as StoredUser[]) : [];
+  } catch {
+    return [];
+  }
+};
+
+const writeStoredUsers = (users: StoredUser[]) => {
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+};
+
+const hashPassword = async (password: string): Promise<string> => {
+  if (typeof crypto === 'undefined' || !crypto.subtle) {
+    return password;
+  }
+
+  const encoder = new TextEncoder();
+  const digest = await crypto.subtle.digest('SHA-256', encoder.encode(password));
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+};
+
 class AuthService {
-  // Hash password
-  async hashPassword(password: string): Promise<string> {
-    return bcrypt.hash(password, SALT_ROUNDS);
+  private sanitizeUser(user: StoredUser): User {
+    const { passwordHash, ...safeUser } = user;
+    return safeUser;
   }
 
-  // Compare password with hash
-  async comparePassword(password: string, hash: string): Promise<boolean> {
-    return bcrypt.compare(password, hash);
-  }
-
-  // Register new user
   async register(credentials: UserCredentials): Promise<AuthResult> {
     try {
-      // Check if username already exists
-      const existingUser = await databaseService.getUserByUsername(credentials.username);
-      if (existingUser) {
-        return { success: false, error: 'Username already exists' };
+      const username = credentials.username.trim();
+      const email = credentials.email.trim();
+      const password = credentials.password.trim();
+
+      if (!username || !email || !password) {
+        return { success: false, error: 'Username, email and password are required.' };
       }
 
-      // Check if email already exists
-      const existingEmail = await databaseService.getUserByEmail(credentials.email);
-      if (existingEmail) {
-        return { success: false, error: 'Email already exists' };
+      const users = readStoredUsers();
+      const usernameMatch = users.find((user) => user.username.toLowerCase() === username.toLowerCase());
+      const emailMatch = users.find((user) => user.email.toLowerCase() === email.toLowerCase());
+
+      if (usernameMatch) {
+        return { success: false, error: 'Username already exists.' };
       }
 
-      // Hash password
-      const passwordHash = await this.hashPassword(credentials.password);
+      if (emailMatch) {
+        return { success: false, error: 'Email already exists.' };
+      }
 
-      // Create user
-      const user = await databaseService.createUser(
-        credentials.username,
-        credentials.email,
-        passwordHash
-      );
+      const user: StoredUser = {
+        id: crypto.randomUUID(),
+        username,
+        email,
+        passwordHash: await hashPassword(password),
+        created_at: new Date().toISOString(),
+      };
 
-      return { success: true, user };
+      const nextUsers = [...users, user];
+      writeStoredUsers(nextUsers);
+      const publicUser = this.sanitizeUser(user);
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(publicUser));
+      return { success: true, user: publicUser };
     } catch (error) {
       console.error('Registration error:', error);
-      return { success: false, error: 'Registration failed' };
+      return { success: false, error: 'Registration failed.' };
     }
   }
 
-  // Login user
   async login(credentials: UserLogin): Promise<AuthResult> {
     try {
-      // Get user by username
-      const user = await databaseService.getUserByUsername(credentials.username);
-      if (!user) {
-        return { success: false, error: 'Invalid username or password' };
+      const username = credentials.username.trim();
+      const password = credentials.password.trim();
+
+      if (!username || !password) {
+        return { success: false, error: 'Username and password are required.' };
       }
 
-      // Compare password
-      const isPasswordValid = await this.comparePassword(
-        credentials.password,
-        user.password_hash
+      const users = readStoredUsers();
+      const user = users.find(
+        (storedUser) =>
+          storedUser.username.toLowerCase() === username.toLowerCase() ||
+          storedUser.email.toLowerCase() === username.toLowerCase()
       );
 
-      if (!isPasswordValid) {
-        return { success: false, error: 'Invalid username or password' };
+      if (!user) {
+        return { success: false, error: 'Invalid username or password.' };
       }
 
-      // Return user (without password hash)
-      return {
-        success: true,
-        user: {
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          created_at: user.created_at
-        }
-      };
+      const passwordHash = await hashPassword(password);
+      if (passwordHash !== user.passwordHash) {
+        return { success: false, error: 'Invalid username or password.' };
+      }
+
+      const publicUser = this.sanitizeUser(user);
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(publicUser));
+      return { success: true, user: publicUser };
     } catch (error) {
       console.error('Login error:', error);
-      return { success: false, error: 'Login failed' };
+      return { success: false, error: 'Login failed.' };
     }
   }
 
-  // Get user by ID
-  async getUserById(userId: string): Promise<User | null> {
+  logout(): boolean {
     try {
-      const result = await databaseService.getClient().query(
-        'SELECT id, username, email, created_at FROM users WHERE id = $1',
-        [userId]
-      );
-      return result.rows.length > 0 ? result.rows[0] : null;
-    } catch (error) {
-      console.error('Error getting user:', error);
+      localStorage.removeItem(CURRENT_USER_KEY);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  getCurrentUser(): User | null {
+    try {
+      const raw = localStorage.getItem(CURRENT_USER_KEY);
+      return raw ? (JSON.parse(raw) as User) : null;
+    } catch {
       return null;
     }
   }
 
-  // Get user by username
-  async getUserByUsername(username: string): Promise<User | null> {
-    try {
-      const result = await databaseService.getClient().query(
-        'SELECT id, username, email, created_at FROM users WHERE username = $1',
-        [username]
-      );
-      const user = result.rows[0];
-      return user ?? null;
-    } catch (error) {
-      console.error('Error getting user by username:', error);
-      return null;
-    }
-  }
-
-  // Get user by email
-  async getUserByEmail(email: string): Promise<User | null> {
-    try {
-      const result = await databaseService.getClient().query(
-        'SELECT id, username, email, created_at FROM users WHERE email = $1',
-        [email]
-      );
-      const user = result.rows[0];
-      return user ?? null;
-    } catch (error) {
-      console.error('Error getting user by email:', error);
-      return null;
-    }
-  }
-
-  // Update user profile
   async updateUserProfile(userId: string, updates: Partial<UserCredentials>): Promise<AuthResult> {
     try {
-      // Check if username is being changed and if it's already taken
+      const users = readStoredUsers();
+      const index = users.findIndex((user) => user.id === userId);
+
+      if (index === -1) {
+        return { success: false, error: 'User not found.' };
+      }
+
+      const currentUser = users[index];
+      if (!currentUser) {
+        return { success: false, error: 'User not found.' };
+      }
+
+      const nextUser: StoredUser = { ...currentUser };
+
       if (updates.username) {
-        const existingUser = await databaseService.getUserByUsername(updates.username);
-        if (existingUser && existingUser.id !== userId) {
-          return { success: false, error: 'Username already exists' };
+        const username = updates.username.trim();
+        if (users.some((user) => user.id !== userId && user.username.toLowerCase() === username.toLowerCase())) {
+          return { success: false, error: 'Username already exists.' };
         }
+        nextUser.username = username;
       }
 
-      // Check if email is being changed and if it's already taken
       if (updates.email) {
-        const existingEmail = await databaseService.getUserByEmail(updates.email);
-        if (existingEmail && existingEmail.id !== userId) {
-          return { success: false, error: 'Email already exists' };
+        const email = updates.email.trim();
+        if (users.some((user) => user.id !== userId && user.email.toLowerCase() === email.toLowerCase())) {
+          return { success: false, error: 'Email already exists.' };
         }
+        nextUser.email = email;
       }
 
-      // If password is being updated, hash it
       if (updates.password) {
-        const passwordHash = await this.hashPassword(updates.password);
-        await databaseService.getClient().query(
-          'UPDATE users SET username = $1, email = $2, password_hash = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4',
-          [updates.username, updates.email, passwordHash, userId]
-        );
-      } else {
-        await databaseService.getClient().query(
-          'UPDATE users SET username = $1, email = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-          [updates.username, updates.email, userId]
-        );
+        nextUser.passwordHash = await hashPassword(updates.password);
       }
 
-      return { success: true };
-    } catch (error) {
-      console.error('Error updating user profile:', error);
-      return { success: false, error: 'Update failed' };
-    }
-  }
+      users[index] = nextUser;
+      writeStoredUsers(users);
 
-  // Delete user
-  async deleteUser(userId: string): Promise<AuthResult> {
-    try {
-      await databaseService.getClient().query('DELETE FROM users WHERE id = $1', [userId]);
-      return { success: true };
+      const publicUser = this.sanitizeUser(nextUser);
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(publicUser));
+      return { success: true, user: publicUser };
     } catch (error) {
-      console.error('Error deleting user:', error);
-      return { success: false, error: 'Deletion failed' };
+      console.error('Update profile error:', error);
+      return { success: false, error: 'Profile update failed.' };
     }
   }
 }
 
-// Export singleton instance
 const authService = new AuthService();
-
 export default authService;

@@ -8,6 +8,7 @@ interface NotesViewProps {
   onCreateNote: () => void;
   onEditNote: (id: string) => void;
   onDeleteNote: (id: string) => void;
+  onAttachNote?: ((noteId: string) => void) | undefined;
   onDragStart: (noteId: string) => void;
   onDragOver: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent, sectionId: 'now' | 'later' | 'todo' | 'general') => void;
@@ -36,6 +37,7 @@ const NotesView: React.FC<NotesViewProps> = ({
   notes, 
   onEditNote, 
   onDeleteNote,
+  onAttachNote,
   onDragStart,
   onDragOver,
   onDrop
@@ -212,6 +214,7 @@ const NotesView: React.FC<NotesViewProps> = ({
               notes={getSectionNotes(section.id)}
               onEditNote={onEditNote}
               onDeleteNote={onDeleteNote}
+              onAttachNote={onAttachNote}
               onDragStart={onDragStart}
               onDragOver={onDragOver}
               onDrop={onDrop}
@@ -251,15 +254,27 @@ const NotesView: React.FC<NotesViewProps> = ({
                   <span className="note-card-date">
                     {new Date(note.updated_at).toLocaleDateString()}
                   </span>
-                  <button
-                    className="delete-note-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteNote(note.id);
-                    }}
-                  >
-                    ×
-                  </button>
+                  <div className="note-card-actions">
+                    <button
+                      className="attach-note-btn"
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAttachNote?.(note.id);
+                      }}
+                    >
+                      Attach
+                    </button>
+                    <button
+                      className="delete-note-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteNote(note.id);
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

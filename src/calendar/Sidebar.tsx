@@ -6,11 +6,12 @@ interface SidebarProps {
   onSelectDate: (date: Date) => void;
   onCreateEvent: () => void;
   onCreateNote: () => void;
-  onTabChange: (tab: 'calendar' | 'notes') => void;
-  activeTab: 'calendar' | 'notes';
+  onCreatePlanner: () => void;
+  onTabChange: (tab: 'calendar' | 'notes' | 'planner') => void;
+  activeTab: 'calendar' | 'notes' | 'planner';
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ selectedDate, onSelectDate, onCreateEvent, onCreateNote, onTabChange, activeTab }) => {
+const Sidebar: React.FC<SidebarProps> = ({ selectedDate, onSelectDate, onCreateEvent, onCreateNote, onCreatePlanner, onTabChange, activeTab }) => {
   // The mini calendar can browse months independently of the main view.
   const [shownMonth, setShownMonth] = useState<Date>(selectedDate);
   useEffect(() => setShownMonth(selectedDate), [selectedDate]);
@@ -32,9 +33,18 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedDate, onSelectDate, onCreateE
         >
           Notes
         </button>
+        <button
+          className={`tab-btn ${activeTab === 'planner' ? 'active' : ''}`}
+          onClick={() => onTabChange('planner')}
+        >
+          Planner
+        </button>
       </div>
 
-      <button className="create-btn" onClick={activeTab === 'notes' ? onCreateNote : onCreateEvent}>
+      <button
+        className="create-btn"
+        onClick={activeTab === 'notes' ? onCreateNote : activeTab === 'planner' ? onCreatePlanner : onCreateEvent}
+      >
         <span className="create-plus">+</span> Create
       </button>
 
