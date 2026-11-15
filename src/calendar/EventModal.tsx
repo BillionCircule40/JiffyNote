@@ -309,7 +309,7 @@ const EventModal: React.FC<EventModalProps> = ({ draft, availableNotes = [], onS
               <button
                 type="button"
                 className="text-btn danger"
-                onClick={() => setConfirmDeleteScope((current) => !current)}
+                onClick={() => setConfirmDeleteScope(true)}
               >
                 Delete
               </button>
@@ -324,25 +324,36 @@ const EventModal: React.FC<EventModalProps> = ({ draft, availableNotes = [], onS
           </button>
         </div>
         {confirmDeleteScope && draft.id && draft.repeat?.enabled && (
-          <div className="delete-scope-panel" role="group" aria-label="Delete recurring event">
-            <span>Delete this recurring event</span>
-            <button
-              type="button"
-              className="text-btn danger"
-              onClick={() => onDelete(draft.id as string, 'occurrence', draft.occurrenceStart ?? draft.start)}
+          <div className="delete-scope-backdrop" onClick={() => setConfirmDeleteScope(false)}>
+            <section
+              className="delete-scope-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="delete-scope-title"
+              onClick={(event) => event.stopPropagation()}
             >
-              This event only
-            </button>
-            <button
-              type="button"
-              className="text-btn danger"
-              onClick={() => onDelete(draft.id as string, 'following', draft.occurrenceStart ?? draft.start)}
-            >
-              This and following
-            </button>
-            <button type="button" className="text-btn" onClick={() => setConfirmDeleteScope(false)}>
-              Cancel
-            </button>
+              <h2 id="delete-scope-title">Delete recurring event?</h2>
+              <p>Choose which events to remove.</p>
+              <div className="delete-scope-actions">
+                <button
+                  type="button"
+                  className="text-btn danger"
+                  onClick={() => onDelete(draft.id as string, 'occurrence', draft.occurrenceStart ?? draft.start)}
+                >
+                  This event only
+                </button>
+                <button
+                  type="button"
+                  className="text-btn danger"
+                  onClick={() => onDelete(draft.id as string, 'following', draft.occurrenceStart ?? draft.start)}
+                >
+                  This and following
+                </button>
+                <button type="button" className="text-btn" onClick={() => setConfirmDeleteScope(false)}>
+                  Cancel
+                </button>
+              </div>
+            </section>
           </div>
         )}
       </form>

@@ -89,10 +89,11 @@ const Header: React.FC<HeaderProps> = ({
         <button className="icon-btn" onClick={onToggleSidebar} aria-label="Toggle sidebar">
           ☰
         </button>
-        <div className="logo">
-          <span className="logo-mark">{new Date().getDate()}</span>
-          <span className="logo-text">JiffyNote</span>
-        </div>
+        <img
+          className="logo-image"
+          src={theme === 'dark' ? '/jiffynote-logo-dark.svg' : '/jiffynote-logo.svg'}
+          alt="JiffyNote"
+        />
         <div className="header-controls-group">
           {onPriorityRangeChange && (
             <PriorityFilter
