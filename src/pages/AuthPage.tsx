@@ -2,10 +2,12 @@ import React, { useMemo, useState } from 'react';
 import authService, { User } from '../services/authService';
 
 interface AuthPageProps {
-  onAuthenticated: (user: User) => void;
+  onAuthenticated: (user: User) => Promise<void>;
+  onContinueAsGuest: () => void;
+  isGuest: boolean;
 }
 
-const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
+const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated, onContinueAsGuest, isGuest }) => {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -51,7 +53,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
         return;
       }
 
-      onAuthenticated(result.user);
+      await onAuthenticated(result.user);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Authentication failed.');
     } finally {
@@ -139,6 +141,9 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
             {isSubmitting ? 'Please wait...' : submitLabel}
           </button>
         </form>
+        <button type="button" className="guest-entry-btn" onClick={onContinueAsGuest}>
+          {isGuest ? 'Back to guest workspace' : 'Continue as guest'}
+        </button>
       </div>
     </div>
   );

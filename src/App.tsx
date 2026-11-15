@@ -11,19 +11,32 @@ import PlannerView, { type PlannerEvent, type PlannerPlan, type PlannerPlanDraft
 import AuthPage from './pages/AuthPage';
 import SettingsPage from './pages/SettingsPage';
 import { CalendarEvent, EventDraft, EVENT_COLORS, ViewMode } from './calendar/types';
-import { addDays, addMonths, startOfWeek } from './calendar/dateUtils';
+import { addDays, addMonths, startOfDay, startOfWeek } from './calendar/dateUtils';
 import { ThemeProvider } from './context/ThemeContext';
 import authService, { User } from './services/authService';
-import { getDefaultRepeatSettings, resetPrioritySelection } from './services/eventService';
+import plannerApiService, { normalizePlannerPlans } from './services/plannerApiService';
+import syncService from './services/syncService';
+import {
+  deleteRecurringOccurrence,
+  expandRecurringEvents,
+  getDefaultRepeatSettings,
+  resetPrioritySelection,
+  type RecurringDeleteScope,
+} from './services/eventService';
 
 const STORAGE_KEY = 'jiffynote.events';
 const NOTES_STORAGE_KEY = 'jiffynote.notes';
 const PLANNER_STORAGE_KEY = 'jiffynote.plans';
+const LEGACY_PLANNER_OWNER_KEY = 'jiffynote.plans.legacyOwner';
 
 // Events live in the browser for now; swap these two for DataBaseQueries later.
-function loadEvents(): CalendarEvent[] {
+function userStorageKey(key: string, userId?: string): string {
+  return userId ? `${key}.${userId}` : key;
+}
+
+function loadEvents(userId?: string): CalendarEvent[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(userStorageKey(STORAGE_KEY, userId));
     const parsed = raw ? (JSON.parse(raw) as CalendarEvent[]) : [];
     return parsed.map((event) => ({
       ...event,
@@ -34,9 +47,9 @@ function loadEvents(): CalendarEvent[] {
   }
 }
 
-function saveEvents(events: CalendarEvent[]): void {
+function saveEvents(events: CalendarEvent[], userId?: string): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+    localStorage.setItem(userStorageKey(STORAGE_KEY, userId), JSON.stringify(events));
   } catch {
     // storage unavailable (private mode etc.) - events stay in memory only
   }
@@ -51,9 +64,9 @@ export interface Note {
   section: 'now' | 'later' | 'todo' | 'general';
 }
 
-function loadNotes(): Note[] {
+function loadNotes(userId?: string): Note[] {
   try {
-    const raw = localStorage.getItem(NOTES_STORAGE_KEY);
+    const raw = localStorage.getItem(userStorageKey(NOTES_STORAGE_KEY, userId));
     const parsed = raw ? (JSON.parse(raw) as Note[]) : [];
     // Ensure all notes have section property (default to 'general')
     return parsed.map(note => ({
@@ -65,26 +78,41 @@ function loadNotes(): Note[] {
   }
 }
 
-function saveNotes(notes: Note[]): void {
+function saveNotes(notes: Note[], userId?: string): void {
   try {
-    localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notes));
+    localStorage.setItem(userStorageKey(NOTES_STORAGE_KEY, userId), JSON.stringify(notes));
   } catch {
     // storage unavailable (private mode etc.) - notes stay in memory only
   }
 }
 
-function loadPlans(): PlannerPlan[] {
+function loadPlans(userId?: string): PlannerPlan[] {
   try {
-    const raw = localStorage.getItem(PLANNER_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as PlannerPlan[]) : [];
+    let raw = localStorage.getItem(PLANNER_STORAGE_KEY);
+    if (userId) {
+      raw = localStorage.getItem(`${PLANNER_STORAGE_KEY}.${userId}`);
+      if (raw) {
+        return normalizePlannerPlans(JSON.parse(raw));
+      }
+
+      const legacyOwner = localStorage.getItem(LEGACY_PLANNER_OWNER_KEY);
+      if (legacyOwner && legacyOwner !== userId) {
+        return [];
+      }
+
+      if (localStorage.getItem(PLANNER_STORAGE_KEY) && !legacyOwner) {
+        localStorage.setItem(LEGACY_PLANNER_OWNER_KEY, userId);
+      }
+    }
+    return raw ? normalizePlannerPlans(JSON.parse(raw)) : [];
   } catch {
     return [];
   }
 }
 
-function savePlans(plans: PlannerPlan[]): void {
+function savePlansLocally(plans: PlannerPlan[], userId: string): void {
   try {
-    localStorage.setItem(PLANNER_STORAGE_KEY, JSON.stringify(plans));
+    localStorage.setItem(`${PLANNER_STORAGE_KEY}.${userId}`, JSON.stringify(plans));
   } catch {
     // storage unavailable (private mode etc.) - plans stay in memory only
   }
@@ -92,11 +120,15 @@ function savePlans(plans: PlannerPlan[]): void {
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(() => authService.getCurrentUser());
+  const [isGuest, setIsGuest] = useState(() => localStorage.getItem('jiffynote.guest') === 'true');
+  const [authOpen, setAuthOpen] = useState(() => !authService.getCurrentUser() && localStorage.getItem('jiffynote.guest') !== 'true');
+  const [cloudReadyUserId, setCloudReadyUserId] = useState<string | null>(null);
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [view, setView] = useState<ViewMode>('week');
-  const [events, setEvents] = useState<CalendarEvent[]>(loadEvents);
-  const [notes, setNotes] = useState<Note[]>(loadNotes);
+  const [events, setEvents] = useState<CalendarEvent[]>(() => loadEvents(authService.getCurrentUser()?.id));
+  const [notes, setNotes] = useState<Note[]>(() => loadNotes(authService.getCurrentUser()?.id));
   const [plans, setPlans] = useState<PlannerPlan[]>(loadPlans);
+  const [plannerReadyUserId, setPlannerReadyUserId] = useState<string | null>(null);
   const [draft, setDraft] = useState<EventDraft | null>(null);
   const [noteDraft, setNoteDraft] = useState<{ id?: string; title: string; content: string; date: string; section: 'now' | 'later' | 'todo' | 'general' } | null>(null);
   const [plannerDraft, setPlannerDraft] = useState<PlannerPlanDraft | null>(null);
@@ -108,16 +140,108 @@ const App: React.FC = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [priorityRange, setPriorityRange] = useState<number[]>(resetPrioritySelection());
 
-  useEffect(() => {
-    const savedUser = authService.getCurrentUser();
-    if (savedUser) {
-      setCurrentUser(savedUser);
-    }
-  }, []);
+  useEffect(() => saveEvents(events, currentUser?.id), [events, currentUser?.id]);
+  useEffect(() => saveNotes(notes, currentUser?.id), [notes, currentUser?.id]);
 
-  useEffect(() => saveEvents(events), [events]);
-  useEffect(() => saveNotes(notes), [notes]);
-  useEffect(() => savePlans(plans), [plans]);
+  useEffect(() => {
+    if (!currentUser) {
+      setCloudReadyUserId(null);
+      return;
+    }
+
+    let active = true;
+    setCloudReadyUserId(null);
+    void syncService.getSnapshot().then((snapshot) => {
+      if (active) {
+        setEvents(snapshot.events);
+        setNotes(snapshot.notes);
+        setCloudReadyUserId(currentUser.id);
+      }
+    }).catch((error: unknown) => {
+      console.error('Unable to load account calendar data:', error);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (!currentUser || cloudReadyUserId !== currentUser.id) {
+      return;
+    }
+
+    void syncService.replaceSnapshot(events, notes).catch((error: unknown) => {
+      console.error('Unable to sync calendar data:', error);
+    });
+  }, [cloudReadyUserId, currentUser?.id, events, notes]);
+  useEffect(() => {
+    if (!currentUser) {
+      setPlannerReadyUserId(null);
+      setPlans(loadPlans());
+      return;
+    }
+
+    let active = true;
+    const legacyPlans = loadPlans(currentUser.id);
+    setPlannerReadyUserId(null);
+    setPlans([]);
+
+    const loadUserPlans = async () => {
+      try {
+        const remotePlans = await plannerApiService.getPlans();
+        const mergedPlans = new Map(legacyPlans.map((plan) => [plan.id, plan]));
+        remotePlans.forEach((plan) => mergedPlans.set(plan.id, plan));
+        const mergedPlanList = Array.from(mergedPlans.values());
+        const plansToUse = legacyPlans.length > 0
+          ? await plannerApiService.replacePlans(mergedPlanList)
+          : remotePlans;
+        if (active) {
+          if (legacyPlans.length > 0) {
+            localStorage.removeItem(PLANNER_STORAGE_KEY);
+          }
+          setPlans(plansToUse);
+        }
+      } catch (error) {
+        console.error('Unable to load planner data from the database:', error);
+        if (active) {
+          setPlans(legacyPlans);
+        }
+      } finally {
+        if (active) {
+          setPlannerReadyUserId(currentUser.id);
+        }
+      }
+    };
+
+    void loadUserPlans();
+    return () => {
+      active = false;
+    };
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (!currentUser || plannerReadyUserId !== currentUser.id) {
+      return;
+    }
+
+    savePlansLocally(plans, currentUser.id);
+    void plannerApiService.replacePlans(plans).catch((error: unknown) => {
+      console.error('Unable to save planner data to the database:', error);
+    });
+  }, [currentUser, plannerReadyUserId, plans]);
+
+  useEffect(() => {
+    if (currentUser) {
+      return;
+    }
+
+    try {
+      localStorage.setItem(PLANNER_STORAGE_KEY, JSON.stringify(plans));
+    } catch {
+      // Guest planner data stays in memory if browser storage is unavailable.
+    }
+  }, [currentUser?.id, plans]);
 
   useEffect(() => {
     if (!plans.length) {
@@ -134,14 +258,49 @@ const App: React.FC = () => {
     }
   }, [plans, selectedPlannerId]);
 
-  const handleAuthenticated = (user: User) => {
-    setCurrentUser(user);
-    setSettingsOpen(false);
+  const handleAuthenticated = async (user: User) => {
+    try {
+      const snapshot = await syncService.mergeGuestData(events, notes);
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(NOTES_STORAGE_KEY);
+        localStorage.removeItem('jiffynote.guest');
+      } catch {
+        // Account data has already been saved remotely.
+      }
+      setEvents(snapshot.events);
+      setNotes(snapshot.notes);
+      setIsGuest(false);
+      setAuthOpen(false);
+      setCurrentUser(user);
+      setSettingsOpen(false);
+    } catch (error) {
+      authService.logout();
+      throw error;
+    }
+  };
+
+  const handleContinueAsGuest = () => {
+    try {
+      localStorage.setItem('jiffynote.guest', 'true');
+    } catch {
+      // The current workspace can still be used for this session.
+    }
+    setIsGuest(true);
+    setAuthOpen(false);
   };
 
   const handleLogout = () => {
     authService.logout();
     setCurrentUser(null);
+    setEvents(loadEvents());
+    setNotes(loadNotes());
+    setIsGuest(true);
+    try {
+      localStorage.setItem('jiffynote.guest', 'true');
+    } catch {
+      // The guest workspace remains available for this session.
+    }
     setSettingsOpen(false);
   };
 
@@ -232,15 +391,17 @@ const App: React.FC = () => {
   };
 
   const openExistingEvent = (event: CalendarEvent) => {
+    const sourceEvent = events.find((storedEvent) => storedEvent.id === event.id) ?? event;
     setDraft({
-      id: event.id,
-      title: event.title,
-      start: new Date(event.start),
-      end: new Date(event.end),
-      color: event.color,
-      priority: typeof event.priority === 'number' ? event.priority : 5,
-      repeat: event.repeat ?? getDefaultRepeatSettings(),
-      noteIds: event.noteIds ?? [],
+      id: sourceEvent.id,
+      occurrenceStart: new Date(event.start),
+      title: sourceEvent.title,
+      start: new Date(sourceEvent.start),
+      end: new Date(sourceEvent.end),
+      color: sourceEvent.color,
+      priority: typeof sourceEvent.priority === 'number' ? sourceEvent.priority : 5,
+      repeat: sourceEvent.repeat ?? getDefaultRepeatSettings(),
+      noteIds: sourceEvent.noteIds ?? [],
     });
   };
 
@@ -259,8 +420,12 @@ const App: React.FC = () => {
     setDraft(null);
   };
 
-  const deleteEvent = (id: string) => {
-    setEvents((prev) => prev.filter((e) => e.id !== id));
+  const deleteEvent = (id: string, scope?: RecurringDeleteScope, occurrenceStart?: Date) => {
+    if (scope && occurrenceStart) {
+      setEvents((prev) => deleteRecurringOccurrence(prev, id, occurrenceStart, scope));
+    } else {
+      setEvents((prev) => prev.filter((event) => event.id !== id));
+    }
     setDraft(null);
   };
 
@@ -438,6 +603,35 @@ const App: React.FC = () => {
     );
   };
 
+  const joinPlannerPlan = (plan: PlannerPlan, weekDate: Date) => {
+    const weekStart = startOfWeek(weekDate);
+    const joinedEvents: CalendarEvent[] = (Array.isArray(plan.events) ? plan.events : []).map((planEvent) => {
+      const eventDate = addDays(weekStart, planEvent.dayOfWeek);
+      const [startHour = 0, startMinute = 0] = planEvent.startTime.split(':').map(Number);
+      const [endHour = 0, endMinute = 0] = planEvent.endTime.split(':').map(Number);
+      const start = new Date(eventDate);
+      const end = new Date(eventDate);
+      start.setHours(startHour, startMinute, 0, 0);
+      end.setHours(endHour, endMinute, 0, 0);
+
+      return {
+        id: crypto.randomUUID(),
+        title: planEvent.title,
+        start: start.toISOString(),
+        end: end.toISOString(),
+        color: planEvent.color,
+        priority: 5,
+        repeat: getDefaultRepeatSettings(),
+        noteIds: [],
+      };
+    });
+
+    setEvents((prev) => [...prev, ...joinedEvents]);
+    setCurrentDate(weekStart);
+    setView('week');
+    setActiveTab('calendar');
+  };
+
   // Drag and drop handlers for notes
   const handleDragStart = (noteId: string) => {
     setDraggedNoteId(noteId);
@@ -465,15 +659,32 @@ const App: React.FC = () => {
       ? [currentDate]
       : Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(currentDate), i));
 
-  const visibleEvents = events.filter((event) => {
+  const priorityEvents = events.filter((event) => {
     const priority = typeof event.priority === 'number' ? event.priority : 5;
     return priorityRange.includes(priority);
   });
+  const eventRangeStart = view === 'year'
+    ? new Date(currentDate.getFullYear(), 0, 1)
+    : view === 'month'
+      ? startOfWeek(new Date(currentDate.getFullYear(), currentDate.getMonth(), 1))
+      : view === 'day'
+        ? startOfDay(currentDate)
+        : startOfWeek(currentDate);
+  const eventRangeEnd = view === 'year'
+    ? new Date(currentDate.getFullYear() + 1, 0, 1)
+    : view === 'month'
+      ? addDays(eventRangeStart, 42)
+      : addDays(eventRangeStart, view === 'day' ? 1 : 7);
+  const visibleEvents = expandRecurringEvents(priorityEvents, eventRangeStart, eventRangeEnd);
 
-  if (!currentUser) {
+  if (!currentUser && (!isGuest || authOpen)) {
     return (
       <ThemeProvider>
-        <AuthPage onAuthenticated={handleAuthenticated} />
+        <AuthPage
+          onAuthenticated={handleAuthenticated}
+          onContinueAsGuest={handleContinueAsGuest}
+          isGuest={isGuest}
+        />
       </ThemeProvider>
     );
   }
@@ -494,6 +705,7 @@ const App: React.FC = () => {
           onPriorityRangeChange={setPriorityRange}
           currentUser={currentUser}
           onOpenSettings={() => setSettingsOpen(true)}
+          onOpenAuth={() => setAuthOpen(true)}
           onLogout={handleLogout}
         />
         <div className="app-body">
@@ -535,9 +747,13 @@ const App: React.FC = () => {
             <PlannerView
               plans={plans}
               selectedPlanId={selectedPlannerId}
+              currentDate={currentDate}
               onSelectPlan={setSelectedPlannerId}
               onSaveEvent={savePlannerEvent}
-              onSavePlan={() => savePlans(plans)}
+              onSavePlan={(plan) => {
+                setPlans((currentPlans) => currentPlans.map((currentPlan) => currentPlan.id === plan.id ? plan : currentPlan));
+              }}
+              onJoinPlan={joinPlannerPlan}
               onDeletePlan={deletePlannerPlan}
               onDeleteEvent={deletePlannerEvent}
               onMoveEvent={movePlannerEvent}

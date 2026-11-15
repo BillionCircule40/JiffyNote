@@ -174,6 +174,11 @@ BCRYPT_SALT_ROUNDS=10
 
 ## Database Migrations
 
+The Docker entrypoint applies migration `004_planner_data.sql` automatically only
+when it initializes a new PostgreSQL data volume. For an existing volume, apply
+the migration once with `psql` against the `jiffynote_db` database before using
+planner persistence.
+
 ### Initial Schema
 
 The migration script `database/migrations/001_initial_schema.sql` creates:

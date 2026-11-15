@@ -12,7 +12,9 @@ const authRoutes_1 = __importDefault(require("./routes/authRoutes"));
 const attachmentRoutes_1 = __importDefault(require("./routes/attachmentRoutes"));
 const eventRoutes_1 = __importDefault(require("./routes/eventRoutes"));
 const noteRoutes_1 = __importDefault(require("./routes/noteRoutes"));
-// import planRoutes from './routes/planRoutes'; // Temporarily disabled - planRoutes.ts not yet created
+const planRoutes_1 = __importDefault(require("./routes/planRoutes"));
+const syncRoutes_1 = __importDefault(require("./routes/syncRoutes"));
+const authMiddleware_1 = require("./middleware/authMiddleware");
 const errorHandler_1 = require("./utils/errorHandler");
 // Create Express app
 const app = (0, express_1.default)();
@@ -48,10 +50,11 @@ app.get('/health', (_req, res) => {
 });
 // API Routes
 app.use('/api/auth', authRoutes_1.default);
-app.use('/api/attachments', attachmentRoutes_1.default);
-app.use('/api/events', eventRoutes_1.default);
-app.use('/api/notes', noteRoutes_1.default);
-//app.use('/api/plans', planRoutes);
+app.use('/api/attachments', authMiddleware_1.authenticateToken, attachmentRoutes_1.default);
+app.use('/api/events', authMiddleware_1.authenticateToken, eventRoutes_1.default);
+app.use('/api/notes', authMiddleware_1.authenticateToken, noteRoutes_1.default);
+app.use('/api/plans', authMiddleware_1.authenticateToken, planRoutes_1.default);
+app.use('/api/sync', authMiddleware_1.authenticateToken, syncRoutes_1.default);
 // Error handling middleware
 app.use(errorHandler_1.errorHandler);
 // Start server

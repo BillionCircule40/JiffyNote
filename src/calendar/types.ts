@@ -16,6 +16,7 @@ export interface CalendarEvent {
 // The event currently open in the editor. `id` is missing for a new event.
 export interface EventDraft {
   id?: string;
+  occurrenceStart?: Date;
   title: string;
   start: Date;
   end: Date;

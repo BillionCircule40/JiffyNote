@@ -1,3 +1,5 @@
+import { apiRequest, AUTH_TOKEN_KEY } from './apiService';
+
 export interface User {
   id: string;
   username: string;
@@ -19,6 +21,7 @@ export interface UserLogin {
 export interface AuthResult {
   success: boolean;
   user?: User;
+  token?: string;
   error?: string;
 }
 
@@ -64,40 +67,21 @@ class AuthService {
     try {
       const username = credentials.username.trim();
       const email = credentials.email.trim();
-      const password = credentials.password.trim();
+      const password = credentials.password;
 
       if (!username || !email || !password) {
         return { success: false, error: 'Username, email and password are required.' };
       }
 
-      const users = readStoredUsers();
-      const usernameMatch = users.find((user) => user.username.toLowerCase() === username.toLowerCase());
-      const emailMatch = users.find((user) => user.email.toLowerCase() === email.toLowerCase());
-
-      if (usernameMatch) {
-        return { success: false, error: 'Username already exists.' };
-      }
-
-      if (emailMatch) {
-        return { success: false, error: 'Email already exists.' };
-      }
-
-      const user: StoredUser = {
-        id: crypto.randomUUID(),
-        username,
-        email,
-        passwordHash: await hashPassword(password),
-        created_at: new Date().toISOString(),
-      };
-
-      const nextUsers = [...users, user];
-      writeStoredUsers(nextUsers);
-      const publicUser = this.sanitizeUser(user);
-      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(publicUser));
-      return { success: true, user: publicUser };
+      const result = await apiRequest<{ user: User; token: string }>('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ username, email, password }),
+      }, false);
+      this.saveSession(result.user, result.token);
+      return { success: true, user: result.user, token: result.token };
     } catch (error) {
       console.error('Registration error:', error);
-      return { success: false, error: 'Registration failed.' };
+      return { success: false, error: error instanceof Error ? error.message : 'Registration failed.' };
     }
   }
 
@@ -110,34 +94,22 @@ class AuthService {
         return { success: false, error: 'Username and password are required.' };
       }
 
-      const users = readStoredUsers();
-      const user = users.find(
-        (storedUser) =>
-          storedUser.username.toLowerCase() === username.toLowerCase() ||
-          storedUser.email.toLowerCase() === username.toLowerCase()
-      );
-
-      if (!user) {
-        return { success: false, error: 'Invalid username or password.' };
-      }
-
-      const passwordHash = await hashPassword(password);
-      if (passwordHash !== user.passwordHash) {
-        return { success: false, error: 'Invalid username or password.' };
-      }
-
-      const publicUser = this.sanitizeUser(user);
-      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(publicUser));
-      return { success: true, user: publicUser };
+      const result = await apiRequest<{ user: User; token: string }>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email: username, password }),
+      }, false);
+      this.saveSession(result.user, result.token);
+      return { success: true, user: result.user, token: result.token };
     } catch (error) {
       console.error('Login error:', error);
-      return { success: false, error: 'Login failed.' };
+      return { success: false, error: error instanceof Error ? error.message : 'Login failed.' };
     }
   }
 
   logout(): boolean {
     try {
       localStorage.removeItem(CURRENT_USER_KEY);
+      localStorage.removeItem(AUTH_TOKEN_KEY);
       return true;
     } catch {
       return false;
@@ -146,11 +118,20 @@ class AuthService {
 
   getCurrentUser(): User | null {
     try {
+      if (!localStorage.getItem(AUTH_TOKEN_KEY)) {
+        localStorage.removeItem(CURRENT_USER_KEY);
+        return null;
+      }
       const raw = localStorage.getItem(CURRENT_USER_KEY);
       return raw ? (JSON.parse(raw) as User) : null;
     } catch {
       return null;
     }
+  }
+
+  private saveSession(user: User, token: string): void {
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+    localStorage.setItem(AUTH_TOKEN_KEY, token);
   }
 
   async updateUserProfile(userId: string, updates: Partial<UserCredentials>): Promise<AuthResult> {

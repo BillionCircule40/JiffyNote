@@ -18,6 +18,7 @@ interface HeaderProps {
   onPriorityRangeChange?: (selectedPriorities: number[]) => void;
   currentUser?: User | null;
   onOpenSettings: () => void;
+  onOpenAuth: () => void;
   onLogout: () => void;
 }
 
@@ -54,6 +55,7 @@ const Header: React.FC<HeaderProps> = ({
   onPriorityRangeChange,
   currentUser,
   onOpenSettings,
+  onOpenAuth,
   onLogout,
 }) => {
   const { theme, toggleTheme } = useTheme();
@@ -83,31 +85,33 @@ const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="header">
-      <button className="icon-btn" onClick={onToggleSidebar} aria-label="Toggle sidebar">
-        ☰
-      </button>
-      <div className="logo">
-        <span className="logo-mark">{new Date().getDate()}</span>
-        <span className="logo-text">JiffyNote</span>
-      </div>
-      <div className="header-controls-group">
-        {onPriorityRangeChange && (
-          <PriorityFilter
-            selectedPriorities={priorityRange}
-            onChange={onPriorityRangeChange}
-          />
-        )}
-        <button className="outline-btn" onClick={onToday}>
-          Today
+      <div className="header-start">
+        <button className="icon-btn" onClick={onToggleSidebar} aria-label="Toggle sidebar">
+          ☰
         </button>
+        <div className="logo">
+          <span className="logo-mark">{new Date().getDate()}</span>
+          <span className="logo-text">JiffyNote</span>
+        </div>
+        <div className="header-controls-group">
+          {onPriorityRangeChange && (
+            <PriorityFilter
+              selectedPriorities={priorityRange}
+              onChange={onPriorityRangeChange}
+            />
+          )}
+          <button className="outline-btn" onClick={onToday}>
+            Today
+          </button>
+        </div>
+        <button className="icon-btn" onClick={onPrev} aria-label="Previous">
+          ‹
+        </button>
+        <button className="icon-btn" onClick={onNext} aria-label="Next">
+          ›
+        </button>
+        <h1 className="header-title">{headerTitle(currentDate, view)}</h1>
       </div>
-      <button className="icon-btn" onClick={onPrev} aria-label="Previous">
-        ‹
-      </button>
-      <button className="icon-btn" onClick={onNext} aria-label="Next">
-        ›
-      </button>
-      <h1 className="header-title">{headerTitle(currentDate, view)}</h1>
       <div className="view-slider" role="group" aria-label="Calendar view">
         <input
           className="view-range"
@@ -131,7 +135,6 @@ const Header: React.FC<HeaderProps> = ({
           ))}
         </div>
       </div>
-      {/* Account Settings Dropdown */}
       <div className="account-menu-wrapper" ref={accountMenuRef}>
         <button
           className="icon-btn account-menu-btn"
@@ -184,11 +187,11 @@ const Header: React.FC<HeaderProps> = ({
                 type="button"
                 onClick={() => {
                   setIsOpen(false);
-                  onOpenSettings();
+                  onOpenAuth();
                 }}
               >
                 <span className="menu-item-icon">🔐</span>
-                <span className="menu-item-text">Login</span>
+                <span className="menu-item-text">Sign in / create account</span>
               </button>
             )}
           </div>

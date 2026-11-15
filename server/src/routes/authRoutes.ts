@@ -1,19 +1,11 @@
 import { Router, Request, Response } from 'express';
-import { createUser, getUserByEmail, getUserById } from '../services/userService';
+import { createUser, getUserByEmail, getUserById, getUserByUsername } from '../services/userService';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
 const router: Router = Router();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-
-interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    username: string;
-    email: string;
-  };
-}
 
 // Register endpoint
 router.post('/register', async (req: Request, res: Response) => {
@@ -74,7 +66,7 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     // Find user
-    const user = await getUserByEmail(email);
+    const user = await getUserByEmail(email) ?? await getUserByUsername(email);
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -108,7 +100,7 @@ router.post('/login', async (req: Request, res: Response) => {
 });
 
 // Get current user profile
-router.get('/profile', async (req: AuthRequest, res: Response) => {
+router.get('/profile', async (req: Request, res: Response) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: 'Unauthorized' });

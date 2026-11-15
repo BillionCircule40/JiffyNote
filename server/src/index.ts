@@ -6,7 +6,9 @@ import authRoutes from './routes/authRoutes';
 import attachmentRoutes from './routes/attachmentRoutes';
 import eventRoutes from './routes/eventRoutes';
 import noteRoutes from './routes/noteRoutes';
-// import planRoutes from './routes/planRoutes'; // Temporarily disabled - planRoutes.ts not yet created
+import planRoutes from './routes/planRoutes';
+import syncRoutes from './routes/syncRoutes';
+import { authenticateToken } from './middleware/authMiddleware';
 import { errorHandler } from './utils/errorHandler';
 
 // Create Express app
@@ -49,10 +51,11 @@ app.get('/health', (_req: Request, res: Response) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/attachments', attachmentRoutes);
-app.use('/api/events', eventRoutes);
-app.use('/api/notes', noteRoutes);
-//app.use('/api/plans', planRoutes);
+app.use('/api/attachments', authenticateToken, attachmentRoutes);
+app.use('/api/events', authenticateToken, eventRoutes);
+app.use('/api/notes', authenticateToken, noteRoutes);
+app.use('/api/plans', authenticateToken, planRoutes);
+app.use('/api/sync', authenticateToken, syncRoutes);
 
 // Error handling middleware
 app.use(errorHandler);

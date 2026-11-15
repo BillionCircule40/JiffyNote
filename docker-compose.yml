@@ -12,6 +12,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./database/migrations/003_complete_schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
       - ./database/seed/001_sample_data.sql:/docker-entrypoint-initdb.d/002_sample_data.sql:ro
+      - ./database/migrations/004_planner_data.sql:/docker-entrypoint-initdb.d/003_planner_data.sql:ro
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     networks:

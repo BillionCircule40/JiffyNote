@@ -1,7 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { EventDraft, EVENT_COLORS } from './types';
 import { fromInputs, toDateInput, toTimeInput } from './dateUtils';
-import { EventRepeatSettings, getDefaultRepeatSettings, summarizeRepeatSettings } from '../services/eventService';
+import {
+  EventRepeatSettings,
+  getDefaultRepeatSettings,
+  summarizeRepeatSettings,
+  type RecurringDeleteScope,
+} from '../services/eventService';
 
 interface EventNoteItem {
   id: string;
@@ -14,7 +19,7 @@ interface EventModalProps {
   draft: EventDraft;
   availableNotes?: EventNoteItem[];
   onSave: (draft: EventDraft) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string, scope?: RecurringDeleteScope, occurrenceStart?: Date) => void;
   onClose: () => void;
 }
 
@@ -37,6 +42,7 @@ const EventModal: React.FC<EventModalProps> = ({ draft, availableNotes = [], onS
   const [attachedNoteIds, setAttachedNoteIds] = useState<string[]>(draft.noteIds ?? []);
   const [showAttachments, setShowAttachments] = useState((draft.noteIds ?? []).length > 0);
   const [selectedNote, setSelectedNote] = useState<EventNoteItem | null>(null);
+  const [confirmDeleteScope, setConfirmDeleteScope] = useState(false);
 
   useEffect(() => {
     setTitle(draft.title);
@@ -54,6 +60,7 @@ const EventModal: React.FC<EventModalProps> = ({ draft, availableNotes = [], onS
     setAttachedNoteIds(draft.noteIds ?? []);
     setShowAttachments((draft.noteIds ?? []).length > 0);
     setSelectedNote(null);
+    setConfirmDeleteScope(false);
   }, [draft]);
 
   const start = fromInputs(date, startTime);
@@ -112,6 +119,7 @@ const EventModal: React.FC<EventModalProps> = ({ draft, availableNotes = [], onS
           endMode: repeatEndMode,
           occurrences: Math.max(1, occurrences),
           endDate: repeatEndMode === 'onDate' ? endDate : null,
+          excludedDates: draft.repeat?.excludedDates ?? [],
         }
       : getDefaultRepeatSettings();
 
@@ -142,8 +150,10 @@ const EventModal: React.FC<EventModalProps> = ({ draft, availableNotes = [], onS
           onChange={(e) => setTitle(e.target.value)}
           autoFocus
         />
-        <div className="modal-row">
+        <div className="modal-row event-date-row">
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <div className="modal-row event-time-row">
           <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
           <span>–</span>
           <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
@@ -295,14 +305,46 @@ const EventModal: React.FC<EventModalProps> = ({ draft, availableNotes = [], onS
 
         <div className="modal-actions">
           {draft.id && (
-            <button type="button" className="text-btn danger" onClick={() => onDelete(draft.id as string)}>
-              Delete
-            </button>
+            draft.repeat?.enabled ? (
+              <button
+                type="button"
+                className="text-btn danger"
+                onClick={() => setConfirmDeleteScope((current) => !current)}
+              >
+                Delete
+              </button>
+            ) : (
+              <button type="button" className="text-btn danger" onClick={() => onDelete(draft.id as string)}>
+                Delete
+              </button>
+            )
           )}
           <button type="submit" className="primary-btn" disabled={invalid}>
             Save
           </button>
         </div>
+        {confirmDeleteScope && draft.id && draft.repeat?.enabled && (
+          <div className="delete-scope-panel" role="group" aria-label="Delete recurring event">
+            <span>Delete this recurring event</span>
+            <button
+              type="button"
+              className="text-btn danger"
+              onClick={() => onDelete(draft.id as string, 'occurrence', draft.occurrenceStart ?? draft.start)}
+            >
+              This event only
+            </button>
+            <button
+              type="button"
+              className="text-btn danger"
+              onClick={() => onDelete(draft.id as string, 'following', draft.occurrenceStart ?? draft.start)}
+            >
+              This and following
+            </button>
+            <button type="button" className="text-btn" onClick={() => setConfirmDeleteScope(false)}>
+              Cancel
+            </button>
+          </div>
+        )}
       </form>
     </div>
   );

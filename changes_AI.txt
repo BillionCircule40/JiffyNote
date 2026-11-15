@@ -783,7 +783,15 @@
 
 **Priority:** High
 **Estimated Time:** 8-10 hours
-**Status:** 
+**Status:** IN PROGRESS
+
+#### Progress (2026-11-14)
+- Wired frontend registration and login to the PostgreSQL-backed API and persisted JWT sessions.
+- Added authenticated planner API access scoped to the signed-in user.
+- Added atomic planner snapshot persistence for plans and nested plan events.
+- Added planner color and recurrence columns plus migration `004_planner_data.sql`.
+- Loaded per-account planner data from PostgreSQL, retained a per-user local fallback, and import existing local plans when the account has none.
+- Calendar events and notes still use browser storage in the application and remain to be integrated.
 
 #### Tasks:
 1. **Docker Configuration**
@@ -831,6 +839,8 @@
      - user_id (UUID, foreign key)
      - name (VARCHAR)
      - description (TEXT)
+   - color (VARCHAR)
+   - recurrence (VARCHAR: 'weekly', 'biweekly', 'monthly', 'yearly')
      - is_pinned (BOOLEAN)
      - created_at (TIMESTAMP)
      - updated_at (TIMESTAMP)
@@ -872,6 +882,12 @@
 - `database/seed/` - Seed data scripts
 - `src/services/databaseService.ts` - DB connection management
 - `src/services/authService.ts` - Authentication logic
+- `src/services/apiService.ts` - Authenticated API requests
+- `src/services/plannerApiService.ts` - Planner persistence API
+- `server/src/middleware/authMiddleware.ts` - JWT authentication for data routes
+- `server/src/routes/planRoutes.ts` - Planner API routes
+- `server/src/services/planService.ts` - Planner database access
+- `database/migrations/004_planner_data.sql` - Planner schema update
 
 **Files to Modify:**
 - `src/DataBase/DataBaseQueries.ts` - Complete implementation
@@ -882,12 +898,12 @@
 
 ## Implementation Order
 
-1. **Phase 6: Notes and Calendar UI Enhancements** (Quick wins, UI improvements) - [x] COMPLETED
-2. **Phase 7: Event Creation and Note Attachment System** (Core feature) - [ ] Not started
-3. **Phase 9: Priority-Based Event Filtering** (Medium complexity) - [ ] Not started
-4. **Phase 8: Planner Section and Calendar Integration** (Complex feature) - [ ] Not started
-5. **Phase 10: User Authentication and Settings** (High priority, foundation) - [ ] Not started
-6. **Phase 5: Docker & Database Setup** (Foundation) - [ ] Not started
+1. **Phase 11: Docker & Database Setup** (Database foundation and account data integration) - [ ] IN PROGRESS
+2. **Phase 6: Notes and Calendar UI Enhancements** (Quick wins, UI improvements) - [x] COMPLETED
+3. **Phase 7: Event Creation and Note Attachment System** (Core feature) - [ ] Not started
+4. **Phase 9: Priority-Based Event Filtering** (Medium complexity) - [ ] Not started
+5. **Phase 8: Planner Section and Calendar Integration** (Complex feature) - [ ] Not started
+6. **Phase 10: User Authentication and Settings** (High priority, foundation) - [ ] Not started
 7. **Phase 1-4: Previous phases** - [x] COMPLETED
 
 ---
@@ -896,7 +912,7 @@
 
 **Completed Phases:** Phase 1, Phase 2, Phase 3, Phase 4, Phase 6 ✅
 
-**Next Steps:** Phase 7 (Event Creation and Note Attachment System)
+**Next Steps:** Complete Phase 11 data persistence for calendar events and notes, then validate Docker startup and migrations.
 
 ---
 
