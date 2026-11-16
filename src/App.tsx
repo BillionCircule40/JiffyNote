@@ -353,7 +353,7 @@ const App: React.FC = () => {
     setDraggedEventId(eventId);
   };
 
-  const handleEventDrop = (e: React.DragEvent, targetDate: Date, targetHour: number) => {
+  const handleEventDrop = (e: React.DragEvent, targetDate: Date, targetHour: number, targetMinute?: number) => {
     e.preventDefault();
     if (draggedEventId) {
       const event = events.find(ev => ev.id === draggedEventId);
@@ -363,7 +363,7 @@ const App: React.FC = () => {
         
         // Calculate time difference
         const newStart = new Date(targetDate);
-        newStart.setHours(targetHour, originalStart.getMinutes(), 0, 0);
+        newStart.setHours(targetHour, targetMinute ?? originalStart.getMinutes(), 0, 0);
         
         // Calculate duration in minutes
         const durationMinutes = (originalEnd.getTime() - originalStart.getTime()) / 60000;
