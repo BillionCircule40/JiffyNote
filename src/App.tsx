@@ -35,6 +35,8 @@ import {
 } from './services/proofService';
 
 const PROOF_ENFORCEMENT_INTERVAL_MS = 60 * 1000;
+// Played whenever an event's proof deadline is missed.
+const MISSED_EVENT_VIDEO_ID = 'rhW7Ts1wDEY';
 
 const STORAGE_KEY = 'jiffynote.events';
 const NOTES_STORAGE_KEY = 'jiffynote.notes';
@@ -157,6 +159,7 @@ const App: React.FC = () => {
     return { userId, state: loadProofState(userId) };
   });
   const [burnNotice, setBurnNotice] = useState<BurnRecord | null>(null);
+  const [missedVideoOpen, setMissedVideoOpen] = useState(false);
   const proofState = proofStore.state;
   const eventsRef = useRef(events);
   eventsRef.current = events;
@@ -194,6 +197,7 @@ const App: React.FC = () => {
             ? { ...current, state: { ...current.state, burns: [...current.state.burns, record] } }
             : current);
           setBurnNotice(record);
+          setMissedVideoOpen(true);
         }
       } finally {
         enforcingRef.current = false;
@@ -1005,7 +1009,41 @@ const App: React.FC = () => {
             proofSettings={proofState.settings}
             burns={proofState.burns}
             onProofSettingsChange={(settings) => updateProofState((state) => ({ ...state, settings }))}
+            onSimulateMiss={() => {
+              const record: BurnRecord = {
+                id: crypto.randomUUID(),
+                occurrenceKey: `simulated@${new Date().toISOString()}`,
+                eventTitle: 'Test event',
+                at: new Date().toISOString(),
+                tokens: 0,
+                simulated: true,
+                provider: 'test',
+                note: 'Simulated missed event (test button). Nothing burned.',
+              };
+              updateProofState((state) => ({ ...state, burns: [...state.burns, record] }));
+              setBurnNotice(record);
+              setSettingsOpen(false);
+              setMissedVideoOpen(true);
+            }}
           />
+        )}
+        {missedVideoOpen && (
+          <div className="modal-backdrop missed-video-backdrop" onClick={() => setMissedVideoOpen(false)}>
+            <div className="missed-video-panel" role="dialog" aria-modal="true" aria-label="Missed event" onClick={(event) => event.stopPropagation()}>
+              <div className="missed-video-header">
+                <strong>You missed {burnNotice?.eventTitle ?? 'an event'}</strong>
+                <button type="button" className="icon-btn small" onClick={() => setMissedVideoOpen(false)} aria-label="Close video">×</button>
+              </div>
+              <div className="missed-video-frame">
+                <iframe
+                  src={`https://www.youtube.com/embed/${MISSED_EVENT_VIDEO_ID}?autoplay=1`}
+                  title="Missed event video"
+                  allow="autoplay; encrypted-media; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            </div>
+          </div>
         )}
         {burnNotice && (
           <div className="burn-toast" role="status">

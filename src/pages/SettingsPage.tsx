@@ -18,6 +18,7 @@ interface SettingsPageProps {
   proofSettings: ProofSettings;
   burns: BurnRecord[];
   onProofSettingsChange: (settings: ProofSettings) => void;
+  onSimulateMiss: () => void;
 }
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -38,6 +39,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   proofSettings,
   burns,
   onProofSettingsChange,
+  onSimulateMiss,
 }) => {
   const { theme, toggleTheme } = useTheme();
   const [username, setUsername] = useState(currentUser?.username ?? '');
@@ -256,6 +258,12 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             />
             <span>Really burn tokens on my key (charges my provider account). Off means burns are only logged.</span>
           </label>
+
+          {proofSettings.provider === 'test' && proofSettings.verifiedAt && (
+            <button type="button" className="settings-save-btn" onClick={onSimulateMiss}>
+              Simulate a missed event
+            </button>
+          )}
 
           <div className="settings-row">
             <span>Burned this month</span>
