@@ -35,10 +35,11 @@ import {
 } from './services/proofService';
 
 const PROOF_ENFORCEMENT_INTERVAL_MS = 60 * 1000;
-// Played back to back whenever an event's proof deadline is missed.
+// Each id opens in its own player, all playing at once, whenever an event's proof deadline is missed.
 const MISSED_EVENT_VIDEO_IDS = ['rhW7Ts1wDEY', 'q88agSZnvng'];
-// YouTube plays the video in the path first, then each id in `playlist`.
-const MISSED_EVENT_VIDEO_URL = `https://www.youtube.com/embed/${MISSED_EVENT_VIDEO_IDS[0]}?autoplay=1&playlist=${MISSED_EVENT_VIDEO_IDS.slice(1).join(',')}`;
+// Stripped-down embed: no controls, keyboard shortcuts, annotations, or fullscreen button.
+const missedEventVideoUrl = (id: string) =>
+  `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&controls=0&disablekb=1&fs=0&iv_load_policy=3&rel=0&playsinline=1`;
 
 const STORAGE_KEY = 'jiffynote.events';
 const NOTES_STORAGE_KEY = 'jiffynote.notes';
@@ -1036,13 +1037,18 @@ const App: React.FC = () => {
                 <strong>You missed {burnNotice?.eventTitle ?? 'an event'}</strong>
                 <button type="button" className="icon-btn small" onClick={() => setMissedVideoOpen(false)} aria-label="Close video">×</button>
               </div>
-              <div className="missed-video-frame">
-                <iframe
-                  src={MISSED_EVENT_VIDEO_URL}
-                  title="Missed event video"
-                  allow="autoplay; encrypted-media; picture-in-picture"
-                  allowFullScreen
-                />
+              <div className="missed-video-grid">
+                {MISSED_EVENT_VIDEO_IDS.map((id, index) => (
+                  <div key={id} className="missed-video-frame">
+                    <iframe
+                      src={missedEventVideoUrl(id)}
+                      title={`Missed event video ${index + 1}`}
+                      allow="autoplay; encrypted-media"
+                    />
+                    {/* Blocks clicks so the video can't be paused or opened on YouTube. */}
+                    <div className="missed-video-shield" aria-hidden="true" />
+                  </div>
+                ))}
               </div>
             </div>
           </div>
