@@ -36,7 +36,7 @@ import {
 
 const PROOF_ENFORCEMENT_INTERVAL_MS = 60 * 1000;
 // Each id opens in its own player, all playing at once, whenever an event's proof deadline is missed.
-const MISSED_EVENT_VIDEO_IDS = ['rhW7Ts1wDEY', 'q88agSZnvng', 'mgxDbkhQY-Q'];
+const MISSED_EVENT_VIDEO_IDS = ['rhW7Ts1wDEY', 'q88agSZnvng', 'mgxDbkhQY-Q', 'mTvhaPzatdU'];
 // Stripped-down embed: no controls, keyboard shortcuts, annotations, or fullscreen button.
 const missedEventVideoUrl = (id: string) =>
   `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&controls=0&disablekb=1&fs=0&iv_load_policy=3&rel=0&playsinline=1`;
