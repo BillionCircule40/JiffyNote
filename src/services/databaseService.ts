@@ -42,6 +42,7 @@ export interface Note {
   updated_at: string;
   is_reminder: boolean;
   reminder_type: 'now' | 'later' | 'todo' | null;
+  section: 'now' | 'later' | 'todo' | 'general';
 }
 
 export interface NoteDraft {
@@ -50,6 +51,7 @@ export interface NoteDraft {
   content: string;
   is_reminder?: boolean;
   reminder_type?: 'now' | 'later' | 'todo' | null;
+  section?: 'now' | 'later' | 'todo' | 'general';
 }
 
 // Event-Note attachment interfaces
@@ -217,7 +219,7 @@ class DatabaseService {
 
     try {
       const result: QueryResult<Note> = await this.client.query(
-        'SELECT id, user_id, title, content, created_at, updated_at, is_reminder, reminder_type FROM notes WHERE user_id = $1 ORDER BY created_at',
+        'SELECT id, user_id, title, content, created_at, updated_at, is_reminder, reminder_type, section FROM notes WHERE user_id = $1 ORDER BY created_at',
         [userId]
       );
       return result.rows;
@@ -256,10 +258,10 @@ class DatabaseService {
       const now = new Date().toISOString();
       const result: QueryResult<Note> = await this.client.query(
         `INSERT INTO notes 
-         (id, user_id, title, content, created_at, updated_at, is_reminder, reminder_type)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         (id, user_id, title, content, created_at, updated_at, is_reminder, reminder_type, section)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING *`,
-        [id, userId, note.title, note.content, now, now, note.is_reminder || false, note.reminder_type]
+        [id, userId, note.title, note.content, now, now, note.is_reminder || false, note.reminder_type, note.section || 'general']
       );
       const createdNote = result.rows[0];
       if (!createdNote) {
@@ -279,16 +281,16 @@ class DatabaseService {
     }
 
     try {
-      const result: QueryResult<Note> = await this.client.query(
-        `UPDATE notes 
+      const result: QueryResult<Note> = await this.client.query(        `UPDATE notes 
          SET title = COALESCE($1, title),
              content = COALESCE($2, content),
              is_reminder = COALESCE($3, is_reminder),
              reminder_type = COALESCE($4, reminder_type),
+             section = COALESCE($5, section),
              updated_at = CURRENT_TIMESTAMP
-         WHERE id = $5
+         WHERE id = $6
          RETURNING *`,
-        [note.title, note.content, note.is_reminder, note.reminder_type, noteId]
+        [note.title, note.content, note.is_reminder, note.reminder_type, note.section, noteId]
       );
       return result.rows[0] ?? null;
     } catch (error) {

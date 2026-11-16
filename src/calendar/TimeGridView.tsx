@@ -10,12 +10,12 @@ interface TimeGridViewProps {
   events: CalendarEvent[];
   onSlotClick: (start: Date) => void;
   onEventClick: (event: CalendarEvent) => void;
-  onEventDragStart?: (event: CalendarEvent) => void;
-  onEventDragOver?: (e: React.DragEvent) => void;
+  onEventDragStart?: (eventId: string) => void;
   onEventDrop?: (e: React.DragEvent, targetDate: Date, targetHour: number) => void;
+  onEventHorizontalDrop?: (e: React.DragEvent, targetDate: Date) => void;
 }
 
-const TimeGridView: React.FC<TimeGridViewProps> = ({ days, events, onSlotClick, onEventClick }) => {
+const TimeGridView: React.FC<TimeGridViewProps> = ({ days, events, onSlotClick, onEventClick, onEventDragStart, onEventDrop, onEventHorizontalDrop }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [now, setNow] = useState(new Date());
 
@@ -71,19 +71,27 @@ const TimeGridView: React.FC<TimeGridViewProps> = ({ days, events, onSlotClick, 
               className="day-column"
               style={{ height: HOUR_HEIGHT * 24 }}
               onClick={(e) => handleColumnClick(day, e)}
+              onDragOver={(e) => {
+                e.preventDefault();
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (onEventHorizontalDrop) {
+                  onEventHorizontalDrop(e, day);
+                }
+              }}
             >
               {HOURS.map((h) => (
-                <div 
-                  key={h} 
-                  className="hour-cell" 
+                <div
+                  key={h}
+                  className="hour-cell"
                   style={{ height: HOUR_HEIGHT }}
                   onDragOver={(e) => {
                     e.preventDefault();
-                    e.dataTransfer.dropEffect = 'move';
-                    onEventDragOver?.(e);
                   }}
                   onDrop={(e) => {
                     e.preventDefault();
+                    e.stopPropagation();
                     onEventDrop?.(e, day, h);
                   }}
                 />
@@ -99,14 +107,16 @@ const TimeGridView: React.FC<TimeGridViewProps> = ({ days, events, onSlotClick, 
                     key={ev.id}
                     className="event-block"
                     draggable
+                    onDragStart={(e) => {
+                      e.stopPropagation();
+                      if (onEventDragStart) {
+                        onEventDragStart(ev.id);
+                      }
+                    }}
                     style={{
                       top: (startMin / 60) * HOUR_HEIGHT,
                       height: (duration / 60) * HOUR_HEIGHT - 2,
                       background: ev.color,
-                    }}
-                    onDragStart={(e) => {
-                      e.dataTransfer.effectAllowed = 'move';
-                      onEventDragStart?.(ev);
                     }}
                     onClick={(e) => {
                       e.stopPropagation();

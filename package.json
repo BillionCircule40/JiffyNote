@@ -3,10 +3,13 @@
   "version": "1.0.0",
   "description": "Calendar planner",
   "main": "index.js",
+  "proxy": "http://localhost:8080",
   "directories": {
     "test": "test"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
+    "@google/genai": "^3.3.0",
     "bcrypt": "^5.1.1",
     "pg": "^8.23.0",
     "react": "^18.2.0",
@@ -20,6 +23,7 @@
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
+    "@types/jest": "^30.0.0",
     "@types/pg": "^8.23.1",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",

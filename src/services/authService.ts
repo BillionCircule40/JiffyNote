@@ -1,10 +1,5 @@
-import bcrypt from 'bcrypt';
-import databaseService from './databaseService';
+import { apiRequest, AUTH_TOKEN_KEY } from './apiService';
 
-// Password configuration
-const SALT_ROUNDS = 10;
-
-// User interfaces
 export interface User {
   id: string;
   username: string;
@@ -26,185 +21,265 @@ export interface UserLogin {
 export interface AuthResult {
   success: boolean;
   user?: User;
+  token?: string;
   error?: string;
 }
 
-// Authentication service class
+interface StoredUser extends User {
+  passwordHash: string;
+}
+
+const USERS_KEY = 'jiffynote.auth.users';
+const CURRENT_USER_KEY = 'jiffynote.auth.currentUser';
+
+const readStoredUsers = (): StoredUser[] => {
+  try {
+    const raw = localStorage.getItem(USERS_KEY);
+    return raw ? (JSON.parse(raw) as StoredUser[]) : [];
+  } catch {
+    return [];
+  }
+};
+
+const writeStoredUsers = (users: StoredUser[]) => {
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+};
+
+const localAuthFallbackEnabled = process.env.NODE_ENV === 'development'
+  || process.env.REACT_APP_ENABLE_LOCAL_AUTH === 'true';
+
+const shouldUseLocalAuth = (error: unknown): boolean =>
+  localAuthFallbackEnabled && error instanceof TypeError;
+
+const hashPassword = async (password: string): Promise<string> => {
+  if (typeof crypto === 'undefined' || !crypto.subtle) {
+    return password;
+  }
+
+  const encoder = new TextEncoder();
+  const digest = await crypto.subtle.digest('SHA-256', encoder.encode(password));
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+};
+
 class AuthService {
-  // Hash password
-  async hashPassword(password: string): Promise<string> {
-    return bcrypt.hash(password, SALT_ROUNDS);
+  private sanitizeUser(user: StoredUser): User {
+    const { passwordHash, ...safeUser } = user;
+    return safeUser;
   }
 
-  // Compare password with hash
-  async comparePassword(password: string, hash: string): Promise<boolean> {
-    return bcrypt.compare(password, hash);
-  }
-
-  // Register new user
   async register(credentials: UserCredentials): Promise<AuthResult> {
+    const username = credentials.username.trim();
+    const email = credentials.email.trim();
+    const password = credentials.password;
+
+    if (!username || !email || !password) {
+      return { success: false, error: 'Username, email and password are required.' };
+    }
+
     try {
-      // Check if username already exists
-      const existingUser = await databaseService.getUserByUsername(credentials.username);
-      if (existingUser) {
-        return { success: false, error: 'Username already exists' };
-      }
-
-      // Check if email already exists
-      const existingEmail = await databaseService.getUserByEmail(credentials.email);
-      if (existingEmail) {
-        return { success: false, error: 'Email already exists' };
-      }
-
-      // Hash password
-      const passwordHash = await this.hashPassword(credentials.password);
-
-      // Create user
-      const user = await databaseService.createUser(
-        credentials.username,
-        credentials.email,
-        passwordHash
-      );
-
-      return { success: true, user };
+      const result = await apiRequest<{ user: User; token: string }>('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ username, email, password }),
+      }, false);
+      this.saveSession(result.user, result.token);
+      return { success: true, user: result.user, token: result.token };
     } catch (error) {
       console.error('Registration error:', error);
-      return { success: false, error: 'Registration failed' };
+      if (shouldUseLocalAuth(error)) {
+        return this.registerLocally({ username, email, password });
+      }
+      return { success: false, error: error instanceof Error ? error.message : 'Registration failed.' };
     }
   }
 
-  // Login user
   async login(credentials: UserLogin): Promise<AuthResult> {
+    const username = credentials.username.trim();
+    const password = credentials.password;
+
+    if (!username || !password) {
+      return { success: false, error: 'Username and password are required.' };
+    }
+
     try {
-      // Get user by username
-      const user = await databaseService.getUserByUsername(credentials.username);
-      if (!user) {
-        return { success: false, error: 'Invalid username or password' };
-      }
-
-      // Compare password
-      const isPasswordValid = await this.comparePassword(
-        credentials.password,
-        user.password_hash
-      );
-
-      if (!isPasswordValid) {
-        return { success: false, error: 'Invalid username or password' };
-      }
-
-      // Return user (without password hash)
-      return {
-        success: true,
-        user: {
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          created_at: user.created_at
-        }
-      };
+      const result = await apiRequest<{ user: User; token: string }>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email: username, password }),
+      }, false);
+      this.saveSession(result.user, result.token);
+      return { success: true, user: result.user, token: result.token };
     } catch (error) {
       console.error('Login error:', error);
-      return { success: false, error: 'Login failed' };
+      if (shouldUseLocalAuth(error)) {
+        return this.loginLocally({ username, password });
+      }
+      return { success: false, error: error instanceof Error ? error.message : 'Login failed.' };
     }
   }
 
-  // Get user by ID
-  async getUserById(userId: string): Promise<User | null> {
+  private async registerLocally(credentials: UserCredentials): Promise<AuthResult> {
     try {
-      const result = await databaseService.getClient().query(
-        'SELECT id, username, email, created_at FROM users WHERE id = $1',
-        [userId]
-      );
-      return result.rows.length > 0 ? result.rows[0] : null;
+      const users = readStoredUsers();
+      const username = credentials.username.trim();
+      const email = credentials.email.trim().toLowerCase();
+
+      if (users.some((user) => user.username.toLowerCase() === username.toLowerCase())) {
+        return { success: false, error: 'Username already exists.' };
+      }
+      if (users.some((user) => user.email.toLowerCase() === email.toLowerCase())) {
+        return { success: false, error: 'Email already exists.' };
+      }
+
+      const user: StoredUser = {
+        id: crypto.randomUUID(),
+        username,
+        email,
+        passwordHash: await hashPassword(credentials.password),
+        created_at: new Date().toISOString(),
+      };
+      writeStoredUsers([...users, user]);
+      const publicUser = this.sanitizeUser(user);
+      this.saveSession(publicUser, `local:${user.id}`);
+      return { success: true, user: publicUser, token: `local:${user.id}` };
     } catch (error) {
-      console.error('Error getting user:', error);
+      console.error('Local registration error:', error);
+      return { success: false, error: 'Local account could not be saved in this browser.' };
+    }
+  }
+
+  private async loginLocally(credentials: UserLogin): Promise<AuthResult> {
+    try {
+      const search = credentials.username.toLowerCase();
+      const user = readStoredUsers().find((storedUser) =>
+        storedUser.username.toLowerCase() === search || storedUser.email.toLowerCase() === search
+      );
+
+      if (!user || await hashPassword(credentials.password) !== user.passwordHash) {
+        return { success: false, error: 'No matching local account. Connect the database or create a local account.' };
+      }
+
+      const publicUser = this.sanitizeUser(user);
+      this.saveSession(publicUser, `local:${user.id}`);
+      return { success: true, user: publicUser, token: `local:${user.id}` };
+    } catch (error) {
+      console.error('Local login error:', error);
+      return { success: false, error: 'Local login failed.' };
+    }
+  }
+
+  logout(): boolean {
+    try {
+      localStorage.removeItem(CURRENT_USER_KEY);
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  getCurrentUser(): User | null {
+    try {
+      const token = localStorage.getItem(AUTH_TOKEN_KEY);
+      if (!token) {
+        localStorage.removeItem(CURRENT_USER_KEY);
+        return null;
+      }
+      const raw = localStorage.getItem(CURRENT_USER_KEY);
+      return raw ? (JSON.parse(raw) as User) : null;
+    } catch {
       return null;
     }
   }
 
-  // Get user by username
-  async getUserByUsername(username: string): Promise<User | null> {
-    try {
-      const result = await databaseService.getClient().query(
-        'SELECT id, username, email, created_at FROM users WHERE username = $1',
-        [username]
-      );
-      const user = result.rows[0];
-      return user ?? null;
-    } catch (error) {
-      console.error('Error getting user by username:', error);
-      return null;
-    }
+  private saveSession(user: User, token: string): void {
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+    localStorage.setItem(AUTH_TOKEN_KEY, token);
   }
 
-  // Get user by email
-  async getUserByEmail(email: string): Promise<User | null> {
-    try {
-      const result = await databaseService.getClient().query(
-        'SELECT id, username, email, created_at FROM users WHERE email = $1',
-        [email]
-      );
-      const user = result.rows[0];
-      return user ?? null;
-    } catch (error) {
-      console.error('Error getting user by email:', error);
-      return null;
-    }
+  isLocalSession(): boolean {
+    return localStorage.getItem(AUTH_TOKEN_KEY)?.startsWith('local:') ?? false;
   }
 
-  // Update user profile
-  async updateUserProfile(userId: string, updates: Partial<UserCredentials>): Promise<AuthResult> {
+  async updateUserProfile(
+    userId: string,
+    updates: Partial<UserCredentials>,
+    currentPassword: string,
+  ): Promise<AuthResult> {
     try {
-      // Check if username is being changed and if it's already taken
+      if (!currentPassword) {
+        return { success: false, error: 'Enter your current password to save account changes.' };
+      }
+
+      if (updates.password && updates.password.length < 8) {
+        return { success: false, error: 'New passwords must be at least 8 characters.' };
+      }
+
+      if (!this.isLocalSession()) {
+        const result = await apiRequest<{ user: User; token: string }>('/auth/profile', {
+          method: 'PUT',
+          body: JSON.stringify({ ...updates, currentPassword }),
+        });
+        this.saveSession(result.user, result.token);
+        return { success: true, user: result.user, token: result.token };
+      }
+
+      const users = readStoredUsers();
+      const index = users.findIndex((user) => user.id === userId);
+
+      if (index === -1) {
+        return { success: false, error: 'User not found.' };
+      }
+
+      const currentUser = users[index];
+      if (!currentUser) {
+        return { success: false, error: 'User not found.' };
+      }
+
+      if (await hashPassword(currentPassword) !== currentUser.passwordHash) {
+        return { success: false, error: 'Current password is incorrect.' };
+      }
+
+      const nextUser: StoredUser = { ...currentUser };
+
       if (updates.username) {
-        const existingUser = await databaseService.getUserByUsername(updates.username);
-        if (existingUser && existingUser.id !== userId) {
-          return { success: false, error: 'Username already exists' };
+        const username = updates.username.trim();
+        if (!username) {
+          return { success: false, error: 'Username cannot be empty.' };
         }
+        if (users.some((user) => user.id !== userId && user.username.toLowerCase() === username.toLowerCase())) {
+          return { success: false, error: 'Username already exists.' };
+        }
+        nextUser.username = username;
       }
 
-      // Check if email is being changed and if it's already taken
       if (updates.email) {
-        const existingEmail = await databaseService.getUserByEmail(updates.email);
-        if (existingEmail && existingEmail.id !== userId) {
-          return { success: false, error: 'Email already exists' };
+        const email = updates.email.trim().toLowerCase();
+        if (!email) {
+          return { success: false, error: 'Email cannot be empty.' };
         }
+        if (users.some((user) => user.id !== userId && user.email.toLowerCase() === email.toLowerCase())) {
+          return { success: false, error: 'Email already exists.' };
+        }
+        nextUser.email = email.toLowerCase();
       }
 
-      // If password is being updated, hash it
       if (updates.password) {
-        const passwordHash = await this.hashPassword(updates.password);
-        await databaseService.getClient().query(
-          'UPDATE users SET username = $1, email = $2, password_hash = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4',
-          [updates.username, updates.email, passwordHash, userId]
-        );
-      } else {
-        await databaseService.getClient().query(
-          'UPDATE users SET username = $1, email = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-          [updates.username, updates.email, userId]
-        );
+        nextUser.passwordHash = await hashPassword(updates.password);
       }
 
-      return { success: true };
-    } catch (error) {
-      console.error('Error updating user profile:', error);
-      return { success: false, error: 'Update failed' };
-    }
-  }
+      users[index] = nextUser;
+      writeStoredUsers(users);
 
-  // Delete user
-  async deleteUser(userId: string): Promise<AuthResult> {
-    try {
-      await databaseService.getClient().query('DELETE FROM users WHERE id = $1', [userId]);
-      return { success: true };
+      const publicUser = this.sanitizeUser(nextUser);
+      this.saveSession(publicUser, `local:${userId}`);
+      return { success: true, user: publicUser };
     } catch (error) {
-      console.error('Error deleting user:', error);
-      return { success: false, error: 'Deletion failed' };
+      console.error('Update profile error:', error);
+      return { success: false, error: 'Profile update failed.' };
     }
   }
 }
 
-// Export singleton instance
 const authService = new AuthService();
-
 export default authService;

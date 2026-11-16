@@ -507,37 +507,37 @@
 
 **Priority:** High
 **Estimated Time:** 8-10 hours
-**Status:** 
+**Status:** ✅ COMPLETED
 
 #### Tasks:
 1. **Note Drag-and-Drop Improvements**
-   - [ ] Enable dragging notes from priority tabs (Now/Later/Todo) back to general notes list
-   - [ ] Implement visual feedback during drag operations
-   - [ ] Support dropping notes into general notes area
-   - [ ] Maintain proper section tracking when notes are moved
+   - [x] Enable dragging notes from priority tabs (Now/Later/Todo) back to general notes list
+   - [x] Implement visual feedback during drag operations
+   - [x] Support dropping notes into general notes area
+   - [x] Maintain proper section tracking when notes are moved
 
 2. **Search Functionality Expansion**
-   - [ ] Add date-based search capability to notes search
-   - [ ] Update search to look at both note title AND content
-   - [ ] Implement search filters for date ranges
-   - [ ] Add search history display
+   - [x] Add date-based search capability to notes search
+   - [x] Update search to look at both note title AND content
+   - [x] Implement search filters for date ranges
+   - [x] Add search history display
 
 3. **Calendar Time/Date Drag-and-Drop**
-   - [ ] Implement click-and-drag functionality for calendar events
-   - [ ] Enable movement at 15-minute increments vertically (time changes)
-   - [ ] Enable horizontal movement across dates
-   - [ ] Update event information (date/time) on drop
-   - [ ] Visual feedback during drag operations
+   - [x] Implement click-and-drag functionality for calendar events
+   - [x] Enable movement at 15-minute increments vertically (time changes)
+   - [x] Enable horizontal movement across dates
+   - [x] Update event information (date/time) on drop
+   - [x] Visual feedback during drag operations
 
 4. **Calendar Day Selection Highlighting**
-   - [ ] Change text color of selected day numbers in week view
-   - [ ] Revert to normal color when another day is selected
-   - [ ] Keep current date color unchanged when selected
-   - [ ] Visual indicator for selected day state
+   - [x] Change text color of selected day numbers in week view
+   - [x] Revert to normal color when another day is selected
+   - [x] Keep current date color unchanged when selected
+   - [x] Visual indicator for selected day state
 
 5. **Create Button Text Update**
-   - [ ] Change "Create Notes" text to just "Create" in notes section
-   - [ ] Ensure consistency across all create buttons
+   - [x] Change "Create Notes" text to just "Create" in notes section
+   - [x] Ensure consistency across all create buttons
 
 **Files to Create:**
 - `src/components/NoteDragEnhancements.tsx` - Enhanced drag functionality
@@ -555,10 +555,18 @@
 - Search functionality now includes date-based searching and full content matching
 - Calendar events can be dragged vertically (15-min increments) and horizontally (date changes)
 - Selected calendar days highlight their text color
-- Create buttons统一 show "Create" text across the application
+- Create buttons show "Create" text across the application
 
 **Date:** 2026-10-07
-**Status:** 
+**Status:** ✅ COMPLETED
+
+**Implementation Details:**
+- Added `isDragOverGeneral` state to NotesView for tracking drag operations
+- Implemented searchService.ts with date range filtering
+- Added event drag handlers (onEventDragStart, onEventDrop, onEventHorizontalDrop)
+- Implemented day selection highlighting in MonthView with selected state
+- Verified create buttons show consistent "Create" text in Sidebar
+- Added CSS styles for day selection and drag visual feedback
 
 ---
 
@@ -775,7 +783,15 @@
 
 **Priority:** High
 **Estimated Time:** 8-10 hours
-**Status:** 
+**Status:** IN PROGRESS
+
+#### Progress (2026-11-14)
+- Wired frontend registration and login to the PostgreSQL-backed API and persisted JWT sessions.
+- Added authenticated planner API access scoped to the signed-in user.
+- Added atomic planner snapshot persistence for plans and nested plan events.
+- Added planner color and recurrence columns plus migration `004_planner_data.sql`.
+- Loaded per-account planner data from PostgreSQL, retained a per-user local fallback, and import existing local plans when the account has none.
+- Calendar events and notes still use browser storage in the application and remain to be integrated.
 
 #### Tasks:
 1. **Docker Configuration**
@@ -823,6 +839,8 @@
      - user_id (UUID, foreign key)
      - name (VARCHAR)
      - description (TEXT)
+   - color (VARCHAR)
+   - recurrence (VARCHAR: 'weekly', 'biweekly', 'monthly', 'yearly')
      - is_pinned (BOOLEAN)
      - created_at (TIMESTAMP)
      - updated_at (TIMESTAMP)
@@ -864,6 +882,12 @@
 - `database/seed/` - Seed data scripts
 - `src/services/databaseService.ts` - DB connection management
 - `src/services/authService.ts` - Authentication logic
+- `src/services/apiService.ts` - Authenticated API requests
+- `src/services/plannerApiService.ts` - Planner persistence API
+- `server/src/middleware/authMiddleware.ts` - JWT authentication for data routes
+- `server/src/routes/planRoutes.ts` - Planner API routes
+- `server/src/services/planService.ts` - Planner database access
+- `database/migrations/004_planner_data.sql` - Planner schema update
 
 **Files to Modify:**
 - `src/DataBase/DataBaseQueries.ts` - Complete implementation
@@ -874,21 +898,21 @@
 
 ## Implementation Order
 
-1. **Phase 6: Notes and Calendar UI Enhancements** (Quick wins, UI improvements) - [ ] Not started
-2. **Phase 7: Event Creation and Note Attachment System** (Core feature) - [ ] Not started
-3. **Phase 9: Priority-Based Event Filtering** (Medium complexity) - [ ] Not started
-4. **Phase 8: Planner Section and Calendar Integration** (Complex feature) - [ ] Not started
-5. **Phase 10: User Authentication and Settings** (High priority, foundation) - [ ] Not started
-6. **Phase 5: Docker & Database Setup** (Foundation) - [ ] Not started
+1. **Phase 11: Docker & Database Setup** (Database foundation and account data integration) - [ ] IN PROGRESS
+2. **Phase 6: Notes and Calendar UI Enhancements** (Quick wins, UI improvements) - [x] COMPLETED
+3. **Phase 7: Event Creation and Note Attachment System** (Core feature) - [ ] Not started
+4. **Phase 9: Priority-Based Event Filtering** (Medium complexity) - [ ] Not started
+5. **Phase 8: Planner Section and Calendar Integration** (Complex feature) - [ ] Not started
+6. **Phase 10: User Authentication and Settings** (High priority, foundation) - [ ] Not started
 7. **Phase 1-4: Previous phases** - [x] COMPLETED
 
 ---
 
 ## Current Progress
 
-**Completed Phases:** Phase 1, Phase 2, Phase 3, Phase 4 ✅
+**Completed Phases:** Phase 1, Phase 2, Phase 3, Phase 4, Phase 6 ✅
 
-**Next Steps:** Phase 6 (Notes and Calendar UI Enhancements)
+**Next Steps:** Complete Phase 11 data persistence for calendar events and notes, then validate Docker startup and migrations.
 
 ---
 

@@ -9,11 +9,14 @@ interface MonthViewProps {
   events: CalendarEvent[];
   onDayClick: (day: Date) => void;
   onEventClick: (event: CalendarEvent) => void;
-  selectedDay?: Date | null;
 }
 
-const MonthView: React.FC<MonthViewProps> = ({ currentDate, events, onDayClick, onEventClick, selectedDay }) => {
+const MonthView: React.FC<MonthViewProps> = ({ currentDate, events, onDayClick, onEventClick }) => {
   const today = new Date();
+
+  const handleDayClick = (day: Date) => {
+    onDayClick(day);
+  };
 
   return (
     <div className="month-view">
@@ -28,14 +31,13 @@ const MonthView: React.FC<MonthViewProps> = ({ currentDate, events, onDayClick, 
             .filter((ev) => isSameDay(new Date(ev.start), day))
             .sort((a, b) => a.start.localeCompare(b.start));
           const outside = day.getMonth() !== currentDate.getMonth();
-          const isSelected = selectedDay ? isSameDay(day, selectedDay) : false;
           return (
             <div
               key={day.toISOString()}
-              className={`month-cell${outside ? ' muted' : ''}${isSelected ? ' selected' : ''}`}
-              onClick={() => onDayClick(day)}
+              className={`month-cell${outside ? ' muted' : ''}${isSameDay(day, currentDate) ? ' selected' : ''}`}
+              onClick={() => handleDayClick(day)}
             >
-              <span className={`month-day-num${isSameDay(day, today) ? ' today' : ''}${isSelected ? ' selected' : ''}`}>
+              <span className={`month-day-num${isSameDay(day, today) ? ' today' : ''}${isSameDay(day, currentDate) ? ' selected' : ''}`}>
                 {day.getDate() === 1
                   ? day.toLocaleDateString([], { month: 'short', day: 'numeric' })
                   : day.getDate()}
