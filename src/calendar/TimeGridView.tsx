@@ -5,13 +5,62 @@ import { formatHour, formatTime, isSameDay, WEEKDAYS_SHORT } from './dateUtils';
 const HOUR_HEIGHT = 48; // px per hour
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
+interface PositionedEvent {
+  event: CalendarEvent;
+  lane: number;
+  laneCount: number;
+}
+
+const layoutOverlappingEvents = (events: CalendarEvent[]): PositionedEvent[] => {
+  const sortedEvents = events
+    .map((event) => ({
+      event,
+      start: new Date(event.start).getTime(),
+      end: new Date(event.end).getTime(),
+    }))
+    .sort((first, second) => first.start - second.start || first.end - second.end);
+  const positioned: PositionedEvent[] = [];
+  let cluster: typeof sortedEvents = [];
+  let clusterEnd = Number.NEGATIVE_INFINITY;
+
+  const layoutCluster = () => {
+    if (cluster.length === 0) {
+      return;
+    }
+
+    const laneEnds: number[] = [];
+    const clusterPositions = cluster.map(({ event, start, end }) => {
+      let lane = laneEnds.findIndex((laneEnd) => laneEnd <= start);
+      if (lane < 0) {
+        lane = laneEnds.length;
+      }
+      laneEnds[lane] = end;
+      return { event, lane };
+    });
+    const laneCount = Math.max(1, laneEnds.length);
+    clusterPositions.forEach(({ event, lane }) => positioned.push({ event, lane, laneCount }));
+    cluster = [];
+    clusterEnd = Number.NEGATIVE_INFINITY;
+  };
+
+  sortedEvents.forEach((item) => {
+    if (item.start >= clusterEnd) {
+      layoutCluster();
+    }
+    cluster.push(item);
+    clusterEnd = Math.max(clusterEnd, item.end);
+  });
+  layoutCluster();
+  return positioned;
+};
+
 interface TimeGridViewProps {
   days: Date[]; // 1 day for Day view, 7 for Week view
   events: CalendarEvent[];
   onSlotClick: (start: Date) => void;
   onEventClick: (event: CalendarEvent) => void;
   onEventDragStart?: (eventId: string) => void;
-  onEventDrop?: (e: React.DragEvent, targetDate: Date, targetHour: number) => void;
+  onEventDrop?: (e: React.DragEvent, targetDate: Date, targetHour: number, targetMinute?: number) => void;
   onEventHorizontalDrop?: (e: React.DragEvent, targetDate: Date) => void;
 }
 
@@ -64,7 +113,7 @@ const TimeGridView: React.FC<TimeGridViewProps> = ({ days, events, onSlotClick, 
         </div>
 
         {days.map((day) => {
-          const dayEvents = events.filter((ev) => isSameDay(new Date(ev.start), day));
+          const dayEvents = layoutOverlappingEvents(events.filter((ev) => isSameDay(new Date(ev.start), day)));
           return (
             <div
               key={day.toISOString()}
@@ -97,7 +146,7 @@ const TimeGridView: React.FC<TimeGridViewProps> = ({ days, events, onSlotClick, 
                 />
               ))}
 
-              {dayEvents.map((ev) => {
+              {dayEvents.map(({ event: ev, lane, laneCount }) => {
                 const start = new Date(ev.start);
                 const end = new Date(ev.end);
                 const startMin = start.getHours() * 60 + start.getMinutes();
@@ -113,9 +162,20 @@ const TimeGridView: React.FC<TimeGridViewProps> = ({ days, events, onSlotClick, 
                         onEventDragStart(ev.id);
                       }
                     }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onEventDrop?.(e, day, start.getHours(), start.getMinutes());
+                    }}
                     style={{
                       top: (startMin / 60) * HOUR_HEIGHT,
                       height: (duration / 60) * HOUR_HEIGHT - 2,
+                      left: `calc(${(lane / laneCount) * 100}% + 2px)`,
+                      width: `calc(${100 / laneCount}% - 10px)`,
                       background: ev.color,
                     }}
                     onClick={(e) => {
