@@ -35,11 +35,22 @@ import {
 } from './services/proofService';
 
 const PROOF_ENFORCEMENT_INTERVAL_MS = 60 * 1000;
-// Each id opens in its own player, all playing at once, whenever an event's proof deadline is missed.
+// Each id opens in its own pop-up window, all at once, whenever an event's proof deadline is missed.
 const MISSED_EVENT_VIDEO_IDS = ['rhW7Ts1wDEY', 'q88agSZnvng', 'mgxDbkhQY-Q', 'mTvhaPzatdU'];
-// Stripped-down embed: no controls, keyboard shortcuts, annotations, or fullscreen button.
-const missedEventVideoUrl = (id: string) =>
-  `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&controls=0&disablekb=1&fs=0&iv_load_policy=3&rel=0&playsinline=1`;
+
+// Opens one window per video id, staggered so they don't stack exactly. Returns the ids the browser blocked.
+function openMissedVideoWindows(ids: string[]): string[] {
+  return ids.filter((id) => {
+    const index = MISSED_EVENT_VIDEO_IDS.indexOf(id);
+    const offset = 60 + index * 70;
+    const win = window.open(
+      `${process.env.PUBLIC_URL}/missed-video.html?id=${encodeURIComponent(id)}`,
+      `jiffynote-missed-video-${index}`,
+      `popup,width=560,height=330,left=${offset},top=${offset}`,
+    );
+    return !win;
+  });
+}
 
 const STORAGE_KEY = 'jiffynote.events';
 const NOTES_STORAGE_KEY = 'jiffynote.notes';
@@ -162,7 +173,8 @@ const App: React.FC = () => {
     return { userId, state: loadProofState(userId) };
   });
   const [burnNotice, setBurnNotice] = useState<BurnRecord | null>(null);
-  const [missedVideoOpen, setMissedVideoOpen] = useState(false);
+  const [blockedVideoIds, setBlockedVideoIds] = useState<string[]>([]);
+  const showMissedVideos = (ids: string[] = MISSED_EVENT_VIDEO_IDS) => setBlockedVideoIds(openMissedVideoWindows(ids));
   const proofState = proofStore.state;
   const eventsRef = useRef(events);
   eventsRef.current = events;
@@ -200,7 +212,7 @@ const App: React.FC = () => {
             ? { ...current, state: { ...current.state, burns: [...current.state.burns, record] } }
             : current);
           setBurnNotice(record);
-          setMissedVideoOpen(true);
+          setBlockedVideoIds(openMissedVideoWindows(MISSED_EVENT_VIDEO_IDS));
         }
       } finally {
         enforcingRef.current = false;
@@ -1026,30 +1038,17 @@ const App: React.FC = () => {
               updateProofState((state) => ({ ...state, burns: [...state.burns, record] }));
               setBurnNotice(record);
               setSettingsOpen(false);
-              setMissedVideoOpen(true);
+              showMissedVideos();
             }}
           />
         )}
-        {missedVideoOpen && (
-          <div className="modal-backdrop missed-video-backdrop" onClick={() => setMissedVideoOpen(false)}>
-            <div className="missed-video-panel" role="dialog" aria-modal="true" aria-label="Missed event" onClick={(event) => event.stopPropagation()}>
-              <div className="missed-video-header">
-                <strong>You missed {burnNotice?.eventTitle ?? 'an event'}</strong>
-                <button type="button" className="icon-btn small" onClick={() => setMissedVideoOpen(false)} aria-label="Close video">×</button>
-              </div>
-              <div className="missed-video-grid">
-                {MISSED_EVENT_VIDEO_IDS.map((id, index) => (
-                  <div key={id} className="missed-video-frame">
-                    <iframe
-                      src={missedEventVideoUrl(id)}
-                      title={`Missed event video ${index + 1}`}
-                      allow="autoplay; encrypted-media"
-                    />
-                    {/* Blocks clicks so the video can't be paused or opened on YouTube. */}
-                    <div className="missed-video-shield" aria-hidden="true" />
-                  </div>
-                ))}
-              </div>
+        {blockedVideoIds.length > 0 && (
+          <div className="video-blocked-notice" role="alert">
+            <strong>Your browser blocked {blockedVideoIds.length} video window{blockedVideoIds.length === 1 ? '' : 's'}.</strong>
+            <span>Allow pop-ups for this site (icon at the right of the address bar), then retry.</span>
+            <div className="video-blocked-actions">
+              <button type="button" className="primary-btn" onClick={() => showMissedVideos(blockedVideoIds)}>Retry</button>
+              <button type="button" className="text-btn" onClick={() => setBlockedVideoIds([])}>Dismiss</button>
             </div>
           </div>
         )}

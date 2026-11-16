@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Missed event</title>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: grid;
+      place-items: center;
+      padding: 6px;
+      box-sizing: border-box;
+      background: linear-gradient(90deg, #ff0040, #ff8c00, #ffee00, #00ff6a, #00c8ff, #7a00ff, #ff00c8, #ff0040);
+      background-size: 400% 100%;
+      animation: rave 6s linear infinite;
+    }
+    @keyframes rave { from { background-position: 0% 50%; } to { background-position: 400% 50%; } }
+    @media (prefers-reduced-motion: reduce) { body { animation: none; } }
+    iframe { width: 100%; height: 100%; border: 0; background: #000; }
+    p { font: 600 16px Arial, sans-serif; color: #000; }
+  </style>
+</head>
+<body>
+  <script>
+    // Opened by JiffyNote when an event's proof deadline is missed: missed-video.html?id=<YouTube video id>
+    var id = new URLSearchParams(location.search).get('id') || '';
+    if (/^[A-Za-z0-9_-]{11}$/.test(id)) {
+      var frame = document.createElement('iframe');
+      frame.src = 'https://www.youtube-nocookie.com/embed/' + id +
+        '?autoplay=1&controls=0&disablekb=1&fs=0&iv_load_policy=3&rel=0&playsinline=1';
+      frame.title = 'Missed event video';
+      frame.allow = 'autoplay; encrypted-media';
+      document.body.appendChild(frame);
+    } else {
+      var msg = document.createElement('p');
+      msg.textContent = 'No valid video id.';
+      document.body.appendChild(msg);
+    }
+  </script>
+</body>
+</html>
