@@ -1,5 +1,6 @@
 import React, { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { formatHour, startOfWeek } from '../calendar/dateUtils';
+import ColorPicker from './ColorPicker';
 
 export type PlannerRecurrence = 'weekly' | 'biweekly' | 'monthly' | 'yearly';
 
@@ -7,9 +8,17 @@ export interface PlannerEvent {
   id: string;
   title: string;
   dayOfWeek: number;
+  daysOfWeek?: number[];
   startTime: string;
   endTime: string;
   color: string;
+  noteIds?: string[];
+}
+
+export interface PlannerNote {
+  id: string;
+  title: string;
+  content: string;
 }
 
 export interface PlannerPlan {
@@ -30,6 +39,7 @@ export interface PlannerPlanDraft {
 
 interface PlannerViewProps {
   plans: PlannerPlan[];
+  notes: PlannerNote[];
   selectedPlanId: string | null;
   currentDate: Date;
   onSelectPlan: (id: string) => void;
@@ -57,8 +67,16 @@ const getEventMinutes = (time: string): number => {
   return hours * 60 + minutes;
 };
 
+const getEventDays = (event: PlannerEvent): number[] => {
+  const days = Array.isArray(event.daysOfWeek)
+    ? event.daysOfWeek.filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+    : [];
+  return days.length > 0 ? Array.from(new Set(days)).sort((first, second) => first - second) : [event.dayOfWeek];
+};
+
 const PlannerView: React.FC<PlannerViewProps> = ({
   plans,
+  notes,
   selectedPlanId,
   currentDate,
   onSelectPlan,
@@ -72,6 +90,7 @@ const PlannerView: React.FC<PlannerViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [draggedEventId, setDraggedEventId] = useState<string | null>(null);
   const [eventDraft, setEventDraft] = useState<PlannerEvent | null>(null);
+  const [noteSearch, setNoteSearch] = useState('');
   const [planSaved, setPlanSaved] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PlannerPlan | null>(null);
   const [joinWeekDate, setJoinWeekDate] = useState('');
@@ -91,6 +110,13 @@ const PlannerView: React.FC<PlannerViewProps> = ({
   }, [plans, searchTerm]);
 
   const selectedPlan = plans.find((plan) => plan.id === selectedPlanId) ?? plans[0] ?? null;
+  const attachedNoteIds = eventDraft?.noteIds ?? [];
+  const filteredNotes = useMemo(() => {
+    const search = noteSearch.trim().toLowerCase();
+    return [...notes]
+      .filter((note) => `${note.title} ${note.content}`.toLowerCase().includes(search))
+      .sort((first, second) => Number(attachedNoteIds.includes(second.id)) - Number(attachedNoteIds.includes(first.id)));
+  }, [attachedNoteIds, noteSearch, notes]);
 
   useEffect(() => {
     setPlanSaved(false);
@@ -103,13 +129,15 @@ const PlannerView: React.FC<PlannerViewProps> = ({
   }, [selectedPlan?.id]);
 
   const openEventEditor = (dayOfWeek = new Date().getDay(), event?: PlannerEvent) => {
-    setEventDraft(event ?? {
+    setEventDraft(event ? { ...event, daysOfWeek: getEventDays(event) } : {
       id: crypto.randomUUID(),
       title: '',
       dayOfWeek,
+      daysOfWeek: [dayOfWeek],
       startTime: '09:00',
       endTime: '10:00',
       color: selectedPlan?.color ?? '#039be5',
+      noteIds: [],
     });
   };
 
@@ -126,9 +154,11 @@ const PlannerView: React.FC<PlannerViewProps> = ({
       id: crypto.randomUUID(),
       title: '',
       dayOfWeek,
+      daysOfWeek: [dayOfWeek],
       startTime: `${startHour}:${startMinute}`,
       endTime: `${endHour}:${endMinute}`,
       color: selectedPlan?.color ?? '#039be5',
+      noteIds: [],
     });
   };
 
@@ -149,13 +179,34 @@ const PlannerView: React.FC<PlannerViewProps> = ({
 
   const saveEvent = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!eventDraft || eventDraft.endTime <= eventDraft.startTime) {
+    if (!eventDraft || getEventDays(eventDraft).length === 0 || eventDraft.endTime <= eventDraft.startTime) {
       return;
     }
 
-    onSaveEvent({ ...eventDraft, title: eventDraft.title.trim() || 'Untitled event' });
+    onSaveEvent({ ...eventDraft, title: eventDraft.title.trim() || 'Untitled event', noteIds: attachedNoteIds });
     setEventDraft(null);
     setPlanSaved(false);
+  };
+
+  const toggleAttachedNote = (noteId: string) => {
+    if (!eventDraft) {
+      return;
+    }
+    const noteIds = attachedNoteIds.includes(noteId)
+      ? attachedNoteIds.filter((id) => id !== noteId)
+      : [...attachedNoteIds, noteId];
+    setEventDraft({ ...eventDraft, noteIds });
+  };
+
+  const toggleEventDay = (day: number) => {
+    if (!eventDraft) {
+      return;
+    }
+    const currentDays = getEventDays(eventDraft);
+    const nextDays = currentDays.includes(day)
+      ? currentDays.length > 1 ? currentDays.filter((selectedDay) => selectedDay !== day) : currentDays
+      : [...currentDays, day].sort((first, second) => first - second);
+    setEventDraft({ ...eventDraft, dayOfWeek: nextDays[0] ?? day, daysOfWeek: nextDays });
   };
 
   return (
@@ -255,7 +306,7 @@ const PlannerView: React.FC<PlannerViewProps> = ({
               </div>
               {DAY_NAMES.map((dayName, dayIndex) => {
                 const dayEvents = (Array.isArray(selectedPlan.events) ? selectedPlan.events : [])
-                  .filter((event) => event.dayOfWeek === dayIndex)
+                  .filter((event) => getEventDays(event).includes(dayIndex))
                   .sort((first, second) => first.startTime.localeCompare(second.startTime));
 
                 return (
@@ -345,15 +396,22 @@ const PlannerView: React.FC<PlannerViewProps> = ({
                 placeholder="Event title"
               />
             </label>
-            <label>
-              <span>Day</span>
-              <select
-                value={eventDraft.dayOfWeek}
-                onChange={(event) => setEventDraft({ ...eventDraft, dayOfWeek: Number(event.target.value) })}
-              >
-                {DAY_NAMES.map((day, index) => <option key={day} value={index}>{day}</option>)}
-              </select>
-            </label>
+            <div className="planner-event-day-picker">
+              <span className="planner-event-field-label">Day</span>
+              <div className="repeat-day-row" role="group" aria-label="Event day">
+                {DAY_NAMES.map((day, index) => (
+                  <button
+                    key={day}
+                    type="button"
+                    className={`repeat-day ${getEventDays(eventDraft).includes(index) ? 'is-selected' : ''}`}
+                    aria-pressed={getEventDays(eventDraft).includes(index)}
+                    onClick={() => toggleEventDay(index)}
+                  >
+                    {day.slice(0, 2)}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="planner-event-time-fields">
               <label>
                 <span>Start</span>
@@ -375,17 +433,55 @@ const PlannerView: React.FC<PlannerViewProps> = ({
             {eventDraft.endTime <= eventDraft.startTime && (
               <p className="planner-event-error">End time must be after start time.</p>
             )}
-            <label className="planner-event-color-field">
-              <span>Color</span>
-              <input
-                type="color"
-                value={eventDraft.color}
-                onChange={(event) => setEventDraft({ ...eventDraft, color: event.target.value })}
+            <div className="planner-event-color-picker">
+              <span className="planner-event-field-label">Color</span>
+              <ColorPicker
+                color={eventDraft.color}
+                onChange={(color) => setEventDraft({ ...eventDraft, color })}
               />
-            </label>
+            </div>
+            <section className="attachment-block planner-attachment-block">
+              <div className="attachment-toggle-row">
+                <span>Attached notes</span>
+                <span className="planner-attached-count">{attachedNoteIds.length}</span>
+              </div>
+              <input
+                type="search"
+                placeholder="Search notes"
+                value={noteSearch}
+                onChange={(event) => setNoteSearch(event.target.value)}
+              />
+              <div className="attachment-list-wrapper">
+                {filteredNotes.length === 0 ? (
+                  <div className="attachment-empty">No notes match this search.</div>
+                ) : (
+                  <div className="attachment-list">
+                    {filteredNotes.map((note) => {
+                      const isAttached = attachedNoteIds.includes(note.id);
+                      return (
+                        <div key={note.id} className={`attachment-item ${isAttached ? 'selected' : ''}`}>
+                          <div className="planner-attached-note-copy">
+                            <strong>{note.title}</strong>
+                            <span>{note.content || 'No note content yet.'}</span>
+                          </div>
+                          <button
+                            type="button"
+                            className="attachment-state-button"
+                            aria-pressed={isAttached}
+                            onClick={() => toggleAttachedNote(note.id)}
+                          >
+                            {isAttached ? 'Linked' : 'Link'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </section>
             <div className="planner-event-editor-actions">
               <button type="button" className="outline-btn" onClick={() => setEventDraft(null)}>Cancel</button>
-              <button type="submit" className="create-btn" disabled={eventDraft.endTime <= eventDraft.startTime}>Save event</button>
+              <button type="submit" className="create-btn" disabled={getEventDays(eventDraft).length === 0 || eventDraft.endTime <= eventDraft.startTime}>Save event</button>
             </div>
           </form>
         </div>

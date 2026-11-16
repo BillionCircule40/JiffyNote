@@ -35,7 +35,7 @@ export const getUserById = async (id: string): Promise<User | null> => {
 export const getUserByUsername = async (username: string): Promise<User | null> => {
   const client = await pool.connect();
   try {
-    const result = await client.query('SELECT * FROM users WHERE username = $1', [username]);
+    const result = await client.query('SELECT * FROM users WHERE LOWER(username) = LOWER($1)', [username]);
     return result.rows[0] || null;
   } catch (error) {
     console.error('Error getting user by username:', error);
@@ -48,11 +48,53 @@ export const getUserByUsername = async (username: string): Promise<User | null> 
 export const getUserByEmail = async (email: string): Promise<User | null> => {
   const client = await pool.connect();
   try {
-    const result = await client.query('SELECT * FROM users WHERE email = $1', [email]);
+    const result = await client.query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [email]);
     return result.rows[0] || null;
   } catch (error) {
     console.error('Error getting user by email:', error);
     throw error;
+  } finally {
+    client.release();
+  }
+};
+
+export const hasAccountFieldConflict = async (
+  field: 'username' | 'email',
+  value: string,
+  excludeUserId?: string,
+): Promise<boolean> => {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT 1 FROM users
+       WHERE LOWER(${field}) = LOWER($1)
+         AND ($2::uuid IS NULL OR id <> $2::uuid)
+       LIMIT 1`,
+      [value, excludeUserId ?? null],
+    );
+    return result.rowCount !== 0;
+  } finally {
+    client.release();
+  }
+};
+
+export const updateUserAccount = async (
+  id: string,
+  updates: { username?: string; email?: string; password_hash?: string },
+): Promise<User | null> => {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `UPDATE users
+       SET username = COALESCE($1, username),
+           email = COALESCE($2, email),
+           password_hash = COALESCE($3, password_hash),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4
+       RETURNING id, username, email, created_at`,
+      [updates.username ?? null, updates.email ?? null, updates.password_hash ?? null, id],
+    );
+    return result.rows[0] ?? null;
   } finally {
     client.release();
   }

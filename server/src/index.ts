@@ -37,9 +37,20 @@ pool.on('error', (err: unknown) => {
 });
 
 // Middleware
+const configuredCorsOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
-  credentials: true
+  origin: (origin, callback) => {
+    const isLocalOrigin = !!origin
+      && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+
+    if (!origin || origin === configuredCorsOrigin || isLocalOrigin) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error('Origin is not allowed by CORS'));
+  },
+  credentials: true,
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteUser = exports.updateUser = exports.createUser = exports.getUserByEmail = exports.getUserByUsername = exports.getUserById = void 0;
+exports.deleteUser = exports.updateUser = exports.createUser = exports.updateUserAccount = exports.hasAccountFieldConflict = exports.getUserByEmail = exports.getUserByUsername = exports.getUserById = void 0;
 const index_1 = require("../index");
 const getUserById = async (id) => {
     const client = await index_1.pool.connect();
@@ -20,7 +20,7 @@ exports.getUserById = getUserById;
 const getUserByUsername = async (username) => {
     const client = await index_1.pool.connect();
     try {
-        const result = await client.query('SELECT * FROM users WHERE username = $1', [username]);
+        const result = await client.query('SELECT * FROM users WHERE LOWER(username) = LOWER($1)', [username]);
         return result.rows[0] || null;
     }
     catch (error) {
@@ -35,7 +35,7 @@ exports.getUserByUsername = getUserByUsername;
 const getUserByEmail = async (email) => {
     const client = await index_1.pool.connect();
     try {
-        const result = await client.query('SELECT * FROM users WHERE email = $1', [email]);
+        const result = await client.query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [email]);
         return result.rows[0] || null;
     }
     catch (error) {
@@ -47,6 +47,37 @@ const getUserByEmail = async (email) => {
     }
 };
 exports.getUserByEmail = getUserByEmail;
+const hasAccountFieldConflict = async (field, value, excludeUserId) => {
+    const client = await index_1.pool.connect();
+    try {
+        const result = await client.query(`SELECT 1 FROM users
+       WHERE LOWER(${field}) = LOWER($1)
+         AND ($2::uuid IS NULL OR id <> $2::uuid)
+       LIMIT 1`, [value, excludeUserId ?? null]);
+        return result.rowCount !== 0;
+    }
+    finally {
+        client.release();
+    }
+};
+exports.hasAccountFieldConflict = hasAccountFieldConflict;
+const updateUserAccount = async (id, updates) => {
+    const client = await index_1.pool.connect();
+    try {
+        const result = await client.query(`UPDATE users
+       SET username = COALESCE($1, username),
+           email = COALESCE($2, email),
+           password_hash = COALESCE($3, password_hash),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4
+       RETURNING id, username, email, created_at`, [updates.username ?? null, updates.email ?? null, updates.password_hash ?? null, id]);
+        return result.rows[0] ?? null;
+    }
+    finally {
+        client.release();
+    }
+};
+exports.updateUserAccount = updateUserAccount;
 const createUser = async (userData) => {
     const client = await index_1.pool.connect();
     try {

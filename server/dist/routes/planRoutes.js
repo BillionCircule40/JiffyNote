@@ -19,9 +19,13 @@ const isValidPlan = (value) => {
             && Number.isInteger(event.dayOfWeek)
             && event.dayOfWeek >= 0
             && event.dayOfWeek <= 6
+            && (event.daysOfWeek === undefined || (Array.isArray(event.daysOfWeek)
+                && event.daysOfWeek.length > 0
+                && event.daysOfWeek.every((day) => Number.isInteger(day) && day >= 0 && day <= 6)))
             && typeof event.startTime === 'string'
             && typeof event.endTime === 'string'
-            && typeof event.color === 'string');
+            && typeof event.color === 'string'
+            && (event.noteIds === undefined || (Array.isArray(event.noteIds) && event.noteIds.every((noteId) => typeof noteId === 'string'))));
 };
 router.get('/', async (req, res) => {
     try {

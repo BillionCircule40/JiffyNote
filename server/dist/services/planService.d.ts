@@ -2,9 +2,11 @@ export interface PlanEventRecord {
     id: string;
     title: string;
     dayOfWeek: number;
+    daysOfWeek?: number[];
     startTime: string;
     endTime: string;
     color: string;
+    noteIds?: string[];
 }
 export interface PlanRecord {
     id: string;

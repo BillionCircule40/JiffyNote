@@ -38,9 +38,18 @@ exports.pool.on('error', (err) => {
     process.exit(-1);
 });
 // Middleware
+const configuredCorsOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
 app.use((0, cors_1.default)({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
-    credentials: true
+    origin: (origin, callback) => {
+        const isLocalOrigin = !!origin
+            && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+        if (!origin || origin === configuredCorsOrigin || isLocalOrigin) {
+            callback(null, true);
+            return;
+        }
+        callback(new Error('Origin is not allowed by CORS'));
+    },
+    credentials: true,
 }));
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));

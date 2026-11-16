@@ -149,6 +149,13 @@ const App: React.FC = () => {
       return;
     }
 
+    if (authService.isLocalSession()) {
+      setEvents(loadEvents(currentUser.id));
+      setNotes(loadNotes(currentUser.id));
+      setCloudReadyUserId(null);
+      return;
+    }
+
     let active = true;
     setCloudReadyUserId(null);
     void syncService.getSnapshot().then((snapshot) => {
@@ -179,6 +186,13 @@ const App: React.FC = () => {
     if (!currentUser) {
       setPlannerReadyUserId(null);
       setPlans(loadPlans());
+      return;
+    }
+
+    if (authService.isLocalSession()) {
+      const localPlans = loadPlans(currentUser.id);
+      setPlans(localPlans);
+      setPlannerReadyUserId(null);
       return;
     }
 
@@ -221,7 +235,16 @@ const App: React.FC = () => {
   }, [currentUser?.id]);
 
   useEffect(() => {
-    if (!currentUser || plannerReadyUserId !== currentUser.id) {
+    if (!currentUser) {
+      return;
+    }
+
+    if (authService.isLocalSession()) {
+      savePlansLocally(plans, currentUser.id);
+      return;
+    }
+
+    if (plannerReadyUserId !== currentUser.id) {
       return;
     }
 
@@ -259,6 +282,27 @@ const App: React.FC = () => {
   }, [plans, selectedPlannerId]);
 
   const handleAuthenticated = async (user: User) => {
+    if (authService.isLocalSession()) {
+      const accountEvents = new Map(loadEvents(user.id).map((event) => [event.id, event]));
+      events.forEach((event) => accountEvents.set(event.id, event));
+      const accountNotes = new Map(loadNotes(user.id).map((note) => [note.id, note]));
+      notes.forEach((note) => accountNotes.set(note.id, note));
+      const mergedEvents = Array.from(accountEvents.values());
+      const mergedNotes = Array.from(accountNotes.values());
+
+      saveEvents(mergedEvents, user.id);
+      saveNotes(mergedNotes, user.id);
+      savePlansLocally(plans, user.id);
+      localStorage.removeItem('jiffynote.guest');
+      setEvents(mergedEvents);
+      setNotes(mergedNotes);
+      setIsGuest(false);
+      setAuthOpen(false);
+      setCurrentUser(user);
+      setSettingsOpen(false);
+      return;
+    }
+
     try {
       const snapshot = await syncService.mergeGuestData(events, notes);
       try {
@@ -535,7 +579,7 @@ const App: React.FC = () => {
               ...item,
               events: [
                 ...item.events.filter((existing) => existing.id !== event.id),
-                event,
+                { ...event, daysOfWeek: event.daysOfWeek?.length ? event.daysOfWeek : [event.dayOfWeek] },
               ],
             }
           : item
@@ -557,7 +601,7 @@ const App: React.FC = () => {
         return {
           ...plan,
           events: plan.events.map((event) =>
-            event.id === eventId ? { ...event, dayOfWeek } : event
+            event.id === eventId ? { ...event, dayOfWeek, daysOfWeek: [dayOfWeek] } : event
           ),
         };
       })
@@ -605,26 +649,31 @@ const App: React.FC = () => {
 
   const joinPlannerPlan = (plan: PlannerPlan, weekDate: Date) => {
     const weekStart = startOfWeek(weekDate);
-    const joinedEvents: CalendarEvent[] = (Array.isArray(plan.events) ? plan.events : []).map((planEvent) => {
-      const eventDate = addDays(weekStart, planEvent.dayOfWeek);
+    const joinedEvents: CalendarEvent[] = (Array.isArray(plan.events) ? plan.events : []).reduce<CalendarEvent[]>((joined, planEvent) => {
+      const selectedDays = Array.isArray(planEvent.daysOfWeek) && planEvent.daysOfWeek.length > 0
+        ? planEvent.daysOfWeek
+        : [planEvent.dayOfWeek];
       const [startHour = 0, startMinute = 0] = planEvent.startTime.split(':').map(Number);
       const [endHour = 0, endMinute = 0] = planEvent.endTime.split(':').map(Number);
-      const start = new Date(eventDate);
-      const end = new Date(eventDate);
-      start.setHours(startHour, startMinute, 0, 0);
-      end.setHours(endHour, endMinute, 0, 0);
-
-      return {
-        id: crypto.randomUUID(),
-        title: planEvent.title,
-        start: start.toISOString(),
-        end: end.toISOString(),
-        color: planEvent.color,
-        priority: 5,
-        repeat: getDefaultRepeatSettings(),
-        noteIds: [],
-      };
-    });
+      selectedDays.forEach((dayOfWeek) => {
+        const eventDate = addDays(weekStart, dayOfWeek);
+        const start = new Date(eventDate);
+        const end = new Date(eventDate);
+        start.setHours(startHour, startMinute, 0, 0);
+        end.setHours(endHour, endMinute, 0, 0);
+        joined.push({
+          id: crypto.randomUUID(),
+          title: planEvent.title,
+          start: start.toISOString(),
+          end: end.toISOString(),
+          color: planEvent.color,
+          priority: 5,
+          repeat: getDefaultRepeatSettings(),
+          noteIds: planEvent.noteIds ?? [],
+        });
+      });
+      return joined;
+    }, []);
 
     setEvents((prev) => [...prev, ...joinedEvents]);
     setCurrentDate(weekStart);
@@ -746,6 +795,7 @@ const App: React.FC = () => {
           ) : activeTab === 'planner' ? (
             <PlannerView
               plans={plans}
+              notes={notes}
               selectedPlanId={selectedPlannerId}
               currentDate={currentDate}
               onSelectPlan={setSelectedPlannerId}
@@ -819,6 +869,7 @@ const App: React.FC = () => {
             currentUser={currentUser}
             onClose={() => setSettingsOpen(false)}
             onLogout={handleLogout}
+            onUserUpdated={setCurrentUser}
           />
         )}
         {plannerDraft && (

@@ -13,6 +13,8 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated, onContinueAsGuest,
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -113,25 +115,75 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated, onContinueAsGuest,
 
           <label className="field">
             <span>Password</span>
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="••••••••"
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            />
+            <span className="password-input-wrap">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="••••••••"
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              />
+              <button
+                type="button"
+                className="password-visibility-btn"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-pressed={showPassword}
+                onClick={() => setShowPassword((visible) => !visible)}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  {showPassword ? (
+                    <>
+                      <path d="M3 3l18 18" />
+                      <path d="M10.6 10.6a2 2 0 002.8 2.8" />
+                      <path d="M9.9 5.2A10.8 10.8 0 0112 5c5 0 8.5 4.1 9.5 6.2a1.8 1.8 0 010 1.6 12.5 12.5 0 01-3.1 3.8" />
+                      <path d="M6.2 6.2a12.6 12.6 0 00-3.7 5 1.8 1.8 0 000 1.6C3.5 14.9 7 19 12 19a10 10 0 004.1-.9" />
+                    </>
+                  ) : (
+                    <>
+                      <path d="M2.5 12s3.4-7 9.5-7 9.5 7 9.5 7-3.4 7-9.5 7-9.5-7-9.5-7z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </>
+                  )}
+                </svg>
+              </button>
+            </span>
           </label>
 
           {mode === 'signup' && (
             <label className="field">
               <span>Confirm password</span>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
-                placeholder="Repeat your password"
-                autoComplete="new-password"
-              />
+              <span className="password-input-wrap">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  placeholder="Repeat your password"
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  className="password-visibility-btn"
+                  aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                  aria-pressed={showConfirmPassword}
+                  onClick={() => setShowConfirmPassword((visible) => !visible)}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    {showConfirmPassword ? (
+                      <>
+                        <path d="M3 3l18 18" />
+                        <path d="M10.6 10.6a2 2 0 002.8 2.8" />
+                        <path d="M9.9 5.2A10.8 10.8 0 0112 5c5 0 8.5 4.1 9.5 6.2a1.8 1.8 0 010 1.6 12.5 12.5 0 01-3.1 3.8" />
+                        <path d="M6.2 6.2a12.6 12.6 0 00-3.7 5 1.8 1.8 0 000 1.6C3.5 14.9 7 19 12 19a10 10 0 004.1-.9" />
+                      </>
+                    ) : (
+                      <>
+                        <path d="M2.5 12s3.4-7 9.5-7 9.5 7 9.5 7-3.4 7-9.5 7-9.5-7-9.5-7z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </>
+                    )}
+                  </svg>
+                </button>
+              </span>
             </label>
           )}
 

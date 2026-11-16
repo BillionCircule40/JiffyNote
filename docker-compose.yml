@@ -6,13 +6,18 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-jiffynote_db}
-      POSTGRES_USER: ${POSTGRES_USER:-jiffynote_user}
+      POSTGRES_USER: ${JIFFYNOTE_POSTGRES_USER:-${POSTGRES_USER:-jiffynote_user}}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_password}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/migrations/003_complete_schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
       - ./database/seed/001_sample_data.sql:/docker-entrypoint-initdb.d/002_sample_data.sql:ro
       - ./database/migrations/004_planner_data.sql:/docker-entrypoint-initdb.d/003_planner_data.sql:ro
+      - ./database/migrations/005_event_priority_recurrence.sql:/docker-entrypoint-initdb.d/004_event_priority_recurrence.sql:ro
+      - ./database/migrations/006_planner_tables.sql:/docker-entrypoint-initdb.d/005_planner_tables.sql:ro
+      - ./database/migrations/007_case_insensitive_account_uniqueness.sql:/docker-entrypoint-initdb.d/006_case_insensitive_account_uniqueness.sql:ro
+      - ./database/migrations/008_plan_event_note_ids.sql:/docker-entrypoint-initdb.d/007_plan_event_note_ids.sql:ro
+      - ./database/migrations/009_plan_event_multiple_days.sql:/docker-entrypoint-initdb.d/008_plan_event_multiple_days.sql:ro
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     networks:
@@ -36,7 +41,7 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: ${POSTGRES_DB:-jiffynote_db}
-      DB_USER: ${POSTGRES_USER:-jiffynote_user}
+      DB_USER: ${JIFFYNOTE_POSTGRES_USER:-${POSTGRES_USER:-jiffynote_user}}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-secure_password}
       JWT_SECRET: ${JWT_SECRET:-change-me-before-deploying}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}

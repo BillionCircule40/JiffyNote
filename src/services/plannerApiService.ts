@@ -9,18 +9,27 @@ const normalizeEvent = (value: unknown, planId: string, index: number): PlannerE
   }
 
   const event = value as Record<string, unknown>;
-  const dayOfWeek = Number(event.dayOfWeek);
-  if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
+  const validDays = Array.isArray(event.daysOfWeek)
+    ? event.daysOfWeek.filter((day): day is number => Number.isInteger(day) && day >= 0 && day <= 6)
+    : [];
+  const legacyDay = Number(event.dayOfWeek);
+  const daysOfWeek = Array.from(new Set(validDays.length > 0
+    ? validDays
+    : Number.isInteger(legacyDay) && legacyDay >= 0 && legacyDay <= 6 ? [legacyDay] : []))
+    .sort((first, second) => first - second);
+  if (daysOfWeek.length === 0) {
     return null;
   }
 
   return {
     id: typeof event.id === 'string' ? event.id : `${planId}-event-${index}`,
     title: typeof event.title === 'string' ? event.title : 'Untitled event',
-    dayOfWeek,
+    dayOfWeek: daysOfWeek[0] ?? 0,
+    daysOfWeek,
     startTime: typeof event.startTime === 'string' ? event.startTime : '09:00',
     endTime: typeof event.endTime === 'string' ? event.endTime : '10:00',
     color: typeof event.color === 'string' ? event.color : '#039be5',
+    noteIds: Array.isArray(event.noteIds) ? event.noteIds.filter((noteId): noteId is string => typeof noteId === 'string') : [],
   };
 };
 

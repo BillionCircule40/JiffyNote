@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { EventDraft, EVENT_COLORS } from './types';
+import { EventDraft } from './types';
 import { fromInputs, toDateInput, toTimeInput } from './dateUtils';
+import ColorPicker from '../components/ColorPicker';
 import {
   EventRepeatSettings,
   getDefaultRepeatSettings,
@@ -167,17 +168,9 @@ const EventModal: React.FC<EventModalProps> = ({ draft, availableNotes = [], onS
             ))}
           </select>
         </div>
-        <div className="modal-row colors">
-          {EVENT_COLORS.map((c) => (
-            <button
-              key={c}
-              type="button"
-              className={`color-swatch${c === color ? ' selected' : ''}`}
-              style={{ background: c }}
-              onClick={() => setColor(c)}
-              aria-label={`Color ${c}`}
-            />
-          ))}
+        <div className="calendar-event-color-picker">
+          <label className="field-label">Color</label>
+          <ColorPicker color={color} onChange={setColor} />
         </div>
 
         <div className="repeat-block">

@@ -179,8 +179,14 @@ const Header: React.FC<HeaderProps> = ({
                   onLogout();
                 }}
               >
-                <span className="menu-item-icon">_logout_</span>
-                <span className="menu-item-text">Logout</span>
+                <span className="menu-item-icon logout-menu-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M10 17l5-5-5-5" />
+                    <path d="M15 12H3" />
+                    <path d="M12 3h6a2 2 0 012 2v14a2 2 0 01-2 2h-6" />
+                  </svg>
+                </span>
+                <span className="menu-item-text">Log out</span>
               </button>
             ) : (
               <button

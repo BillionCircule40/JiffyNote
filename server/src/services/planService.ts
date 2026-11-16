@@ -5,9 +5,11 @@ export interface PlanEventRecord {
   id: string;
   title: string;
   dayOfWeek: number;
+  daysOfWeek?: number[];
   startTime: string;
   endTime: string;
   color: string;
+  noteIds?: string[];
 }
 
 export interface PlanRecord {
@@ -28,9 +30,11 @@ const getPlansWithClient = async (client: PoolClient, userId: string): Promise<P
   const eventsResult = await client.query(
     `SELECT plan_events.id, plan_events.plan_id, plan_events.title,
             plan_events.day_of_week AS "dayOfWeek",
+            plan_events.days_of_week AS "daysOfWeek",
             TO_CHAR(plan_events.start_time, 'HH24:MI') AS "startTime",
             TO_CHAR(plan_events.end_time, 'HH24:MI') AS "endTime",
-            plan_events.color
+            plan_events.color,
+            plan_events.note_ids AS "noteIds"
      FROM plan_events
      INNER JOIN plans ON plans.id = plan_events.plan_id
      WHERE plans.user_id = $1
@@ -45,9 +49,11 @@ const getPlansWithClient = async (client: PoolClient, userId: string): Promise<P
       id: event.id,
       title: event.title,
       dayOfWeek: event.dayOfWeek,
+      daysOfWeek: event.daysOfWeek?.length ? event.daysOfWeek : [event.dayOfWeek],
       startTime: event.startTime,
       endTime: event.endTime,
       color: event.color,
+      noteIds: event.noteIds ?? [],
     });
     eventsByPlan.set(event.plan_id, events);
   }
@@ -86,9 +92,9 @@ export const replacePlansForUser = async (userId: string, plans: PlanRecord[]): 
 
       for (const event of plan.events) {
         await client.query(
-          `INSERT INTO plan_events (id, plan_id, title, day_of_week, start_time, end_time, color)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [event.id, plan.id, event.title, event.dayOfWeek, event.startTime, event.endTime, event.color]
+          `INSERT INTO plan_events (id, plan_id, title, day_of_week, days_of_week, start_time, end_time, color, note_ids)
+           VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9::jsonb)`,
+          [event.id, plan.id, event.title, event.dayOfWeek, JSON.stringify(event.daysOfWeek?.length ? event.daysOfWeek : [event.dayOfWeek]), event.startTime, event.endTime, event.color, JSON.stringify(event.noteIds ?? [])]
         );
       }
     }
