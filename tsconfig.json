@@ -26,4 +26,6 @@
     "noEmitOnError": true,
     "allowJs": true,
   },
+  // The backend in server/ has its own tsconfig and dependencies.
+  "include": ["src"],
 }
