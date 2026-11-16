@@ -8,6 +8,7 @@ import {
   summarizeRepeatSettings,
   type RecurringDeleteScope,
 } from '../services/eventService';
+import { readImageAsDataUrl, type BurnRecord, type ProofSubmission, type ProofVerdict } from '../services/proofService';
 
 interface EventNoteItem {
   id: string;
@@ -16,9 +17,18 @@ interface EventNoteItem {
   section?: string;
 }
 
+export interface EventProofProps {
+  hasVerifiedKey: boolean;
+  graceHours: number;
+  submissions: ProofSubmission[];
+  burn?: BurnRecord;
+  onSubmit: (text: string, imageDataUrl?: string) => Promise<ProofVerdict>;
+}
+
 interface EventModalProps {
   draft: EventDraft;
   availableNotes?: EventNoteItem[];
+  proof?: EventProofProps | undefined;
   onSave: (draft: EventDraft) => void;
   onDelete: (id: string, scope?: RecurringDeleteScope, occurrenceStart?: Date) => void;
   onClose: () => void;
@@ -26,7 +36,7 @@ interface EventModalProps {
 
 const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-const EventModal: React.FC<EventModalProps> = ({ draft, availableNotes = [], onSave, onDelete, onClose }) => {
+const EventModal: React.FC<EventModalProps> = ({ draft, availableNotes = [], proof, onSave, onDelete, onClose }) => {
   const [title, setTitle] = useState(draft.title);
   const [date, setDate] = useState(toDateInput(draft.start));
   const [startTime, setStartTime] = useState(toTimeInput(draft.start));
@@ -44,6 +54,11 @@ const EventModal: React.FC<EventModalProps> = ({ draft, availableNotes = [], onS
   const [showAttachments, setShowAttachments] = useState((draft.noteIds ?? []).length > 0);
   const [selectedNote, setSelectedNote] = useState<EventNoteItem | null>(null);
   const [confirmDeleteScope, setConfirmDeleteScope] = useState(false);
+  const [requiresProof, setRequiresProof] = useState(Boolean(draft.requiresProof));
+  const [proofText, setProofText] = useState('');
+  const [proofImage, setProofImage] = useState<string | undefined>(undefined);
+  const [proofBusy, setProofBusy] = useState(false);
+  const [proofError, setProofError] = useState('');
 
   useEffect(() => {
     setTitle(draft.title);
@@ -62,6 +77,10 @@ const EventModal: React.FC<EventModalProps> = ({ draft, availableNotes = [], onS
     setShowAttachments((draft.noteIds ?? []).length > 0);
     setSelectedNote(null);
     setConfirmDeleteScope(false);
+    setRequiresProof(Boolean(draft.requiresProof));
+    setProofText('');
+    setProofImage(undefined);
+    setProofError('');
   }, [draft]);
 
   const start = fromInputs(date, startTime);
@@ -133,7 +152,43 @@ const EventModal: React.FC<EventModalProps> = ({ draft, availableNotes = [], onS
       priority,
       repeat: repeatConfig,
       noteIds: attachedNoteIds,
+      requiresProof,
     });
+  };
+
+  const occurrenceStart = draft.occurrenceStart ?? draft.start;
+  const occurrenceEnd = new Date(occurrenceStart.getTime() + (draft.end.getTime() - draft.start.getTime()));
+  const acceptedProof = proof?.submissions.find((submission) => submission.accepted);
+  const latestProof = proof?.submissions[proof.submissions.length - 1];
+  const canSubmitProof = Boolean(draft.id && draft.requiresProof && proof && occurrenceStart.getTime() <= Date.now());
+  const proofDeadline = new Date(occurrenceEnd.getTime() + (proof?.graceHours ?? 0) * 60 * 60 * 1000);
+
+  const handleProofImage = async (file: File | undefined) => {
+    setProofError('');
+    if (!file) {
+      setProofImage(undefined);
+      return;
+    }
+    try {
+      setProofImage(await readImageAsDataUrl(file));
+    } catch (error) {
+      setProofError(error instanceof Error ? error.message : 'Could not read the image.');
+    }
+  };
+
+  const submitProof = async () => {
+    if (!proof) return;
+    setProofBusy(true);
+    setProofError('');
+    try {
+      const verdict = await proof.onSubmit(proofText, proofImage);
+      if (verdict.accepted) {
+        setProofText('');
+        setProofImage(undefined);
+      }
+    } finally {
+      setProofBusy(false);
+    }
   };
 
   return (
@@ -293,6 +348,61 @@ const EventModal: React.FC<EventModalProps> = ({ draft, availableNotes = [], onS
                 </div>
               )}
             </>
+          )}
+        </div>
+
+        <div className="proof-block">
+          <button
+            type="button"
+            className="repeat-toggle-row"
+            onClick={() => setRequiresProof((current) => !current)}
+          >
+            <span>Requires proof</span>
+            <span className={`toggle-switch ${requiresProof ? 'on' : ''}`}>
+              <span className="toggle-knob" />
+            </span>
+          </button>
+          {requiresProof && !draft.requiresProof && (
+            <p className="proof-hint">
+              After saving, each occurrence needs accepted proof within {proof?.graceHours ?? 24}h of ending, or tokens get burned.
+            </p>
+          )}
+
+          {canSubmitProof && proof && (
+            <div className="proof-panel">
+              {acceptedProof ? (
+                <p className="proof-status accepted">Proof accepted: {acceptedProof.reason}</p>
+              ) : proof.burn ? (
+                <p className="proof-status burned">Missed. {proof.burn.note}</p>
+              ) : (
+                <>
+                  <p className="proof-hint">Proof due by {proofDeadline.toLocaleString()}.</p>
+                  {!proof.hasVerifiedKey && (
+                    <p className="proof-status rejected">Add and verify an API key in Settings to submit proof.</p>
+                  )}
+                  <textarea
+                    rows={3}
+                    placeholder="Describe what you did"
+                    value={proofText}
+                    onChange={(e) => setProofText(e.target.value)}
+                  />
+                  <input type="file" accept="image/*" onChange={(e) => void handleProofImage(e.target.files?.[0])} />
+                  {proofImage && <img className="proof-preview" src={proofImage} alt="Proof preview" />}
+                  <button
+                    type="button"
+                    className="primary-btn"
+                    disabled={proofBusy || !proof.hasVerifiedKey || (!proofText.trim() && !proofImage)}
+                    onClick={() => void submitProof()}
+                  >
+                    {proofBusy ? 'Checking…' : 'Submit proof'}
+                  </button>
+                  {latestProof && !latestProof.accepted && (
+                    <p className="proof-status rejected">Rejected: {latestProof.reason}</p>
+                  )}
+                </>
+              )}
+              {proofError && <p className="proof-status rejected">{proofError}</p>}
+            </div>
           )}
         </div>
 

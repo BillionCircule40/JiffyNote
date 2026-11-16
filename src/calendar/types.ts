@@ -24,6 +24,8 @@ export interface EventDraft {
   repeat?: EventRepeatSettings;
   noteIds?: string[];
   priority?: number;
+  // Stored in the proof store (proofService), not on the event itself.
+  requiresProof?: boolean;
 }
 
 export const defaultRepeatSettings = getDefaultRepeatSettings;

@@ -8,6 +8,8 @@
     "test": "test"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
+    "@google/genai": "^3.3.0",
     "bcrypt": "^5.1.1",
     "pg": "^8.23.0",
     "react": "^18.2.0",

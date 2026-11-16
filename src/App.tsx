@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Header from './calendar/Header';
 import Sidebar from './calendar/Sidebar';
 import TimeGridView from './calendar/TimeGridView';
@@ -23,6 +23,18 @@ import {
   resetPrioritySelection,
   type RecurringDeleteScope,
 } from './services/eventService';
+import {
+  burnForMissed,
+  checkProof,
+  findMissedOccurrences,
+  loadProofState,
+  occurrenceKey,
+  saveProofState,
+  type BurnRecord,
+  type ProofState,
+} from './services/proofService';
+
+const PROOF_ENFORCEMENT_INTERVAL_MS = 60 * 1000;
 
 const STORAGE_KEY = 'jiffynote.events';
 const NOTES_STORAGE_KEY = 'jiffynote.notes';
@@ -139,6 +151,68 @@ const App: React.FC = () => {
   const [draggedEventId, setDraggedEventId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [priorityRange, setPriorityRange] = useState<number[]>(resetPrioritySelection());
+  // Tagged with its owner so a user switch never writes one user's proof data under another's key.
+  const [proofStore, setProofStore] = useState<{ userId: string | undefined; state: ProofState }>(() => {
+    const userId = authService.getCurrentUser()?.id;
+    return { userId, state: loadProofState(userId) };
+  });
+  const [burnNotice, setBurnNotice] = useState<BurnRecord | null>(null);
+  const proofState = proofStore.state;
+  const eventsRef = useRef(events);
+  eventsRef.current = events;
+  const proofStoreRef = useRef(proofStore);
+  proofStoreRef.current = proofStore;
+  const enforcingRef = useRef(false);
+
+  const updateProofState = (update: (state: ProofState) => ProofState) => {
+    setProofStore((current) => ({ ...current, state: update(current.state) }));
+  };
+
+  useEffect(() => {
+    if (proofStore.userId !== currentUser?.id) {
+      setProofStore({ userId: currentUser?.id, state: loadProofState(currentUser?.id) });
+      return;
+    }
+    saveProofState(proofStore.state, proofStore.userId);
+  }, [proofStore, currentUser?.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const enforce = async () => {
+      if (enforcingRef.current) return;
+      enforcingRef.current = true;
+      try {
+        const owner = proofStoreRef.current.userId;
+        let state = proofStoreRef.current.state;
+        for (const missed of findMissedOccurrences(eventsRef.current, state)) {
+          const record = await burnForMissed(missed, state);
+          if (cancelled || proofStoreRef.current.userId !== owner) return;
+          if (!record) continue;
+          state = { ...state, burns: [...state.burns, record] };
+          setProofStore((current) => current.userId === owner
+            ? { ...current, state: { ...current.state, burns: [...current.state.burns, record] } }
+            : current);
+          setBurnNotice(record);
+        }
+      } finally {
+        enforcingRef.current = false;
+      }
+    };
+
+    void enforce();
+    const timer = window.setInterval(() => void enforce(), PROOF_ENFORCEMENT_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (!burnNotice) return;
+    const timer = window.setTimeout(() => setBurnNotice(null), 10000);
+    return () => window.clearTimeout(timer);
+  }, [burnNotice]);
 
   useEffect(() => saveEvents(events, currentUser?.id), [events, currentUser?.id]);
   useEffect(() => saveNotes(notes, currentUser?.id), [notes, currentUser?.id]);
@@ -431,6 +505,7 @@ const App: React.FC = () => {
       priority: 5,
       repeat: getDefaultRepeatSettings(),
       noteIds: [],
+      requiresProof: false,
     });
   };
 
@@ -446,6 +521,7 @@ const App: React.FC = () => {
       priority: typeof sourceEvent.priority === 'number' ? sourceEvent.priority : 5,
       repeat: sourceEvent.repeat ?? getDefaultRepeatSettings(),
       noteIds: sourceEvent.noteIds ?? [],
+      requiresProof: Boolean(proofState.requiredSince[sourceEvent.id]),
     });
   };
 
@@ -461,6 +537,14 @@ const App: React.FC = () => {
       noteIds: d.noteIds ?? [],
     };
     setEvents((prev) => [...prev.filter((e) => e.id !== saved.id), saved]);
+    updateProofState((state) => {
+      const isRequired = Boolean(state.requiredSince[saved.id]);
+      if (Boolean(d.requiresProof) === isRequired) return state;
+      const requiredSince = { ...state.requiredSince };
+      if (d.requiresProof) requiredSince[saved.id] = new Date().toISOString();
+      else delete requiredSince[saved.id];
+      return { ...state, requiredSince };
+    });
     setDraft(null);
   };
 
@@ -469,8 +553,55 @@ const App: React.FC = () => {
       setEvents((prev) => deleteRecurringOccurrence(prev, id, occurrenceStart, scope));
     } else {
       setEvents((prev) => prev.filter((event) => event.id !== id));
+      updateProofState((state) => {
+        if (!state.requiredSince[id]) return state;
+        const requiredSince = { ...state.requiredSince };
+        delete requiredSince[id];
+        return { ...state, requiredSince };
+      });
     }
     setDraft(null);
+  };
+
+  const buildProofProps = (eventDraft: EventDraft) => {
+    if (!eventDraft.id) return undefined;
+    const eventId = eventDraft.id;
+    const occurrenceStart = eventDraft.occurrenceStart ?? eventDraft.start;
+    const occurrenceEnd = new Date(occurrenceStart.getTime() + (eventDraft.end.getTime() - eventDraft.start.getTime()));
+    const key = occurrenceKey(eventId, occurrenceStart);
+    const burn = proofState.burns.find((record) => record.occurrenceKey === key);
+    return {
+      hasVerifiedKey: Boolean(proofState.settings.verifiedAt),
+      graceHours: proofState.settings.graceHours,
+      submissions: proofState.submissions.filter((submission) => submission.occurrenceKey === key),
+      ...(burn ? { burn } : {}),
+      onSubmit: async (text: string, imageDataUrl?: string) => {
+        const linkedNotes = notes
+          .filter((note) => (eventDraft.noteIds ?? []).includes(note.id))
+          .map((note) => `${note.title}: ${note.content}`);
+        const verdict = await checkProof(proofState.settings, {
+          eventTitle: eventDraft.title,
+          occurrenceStart,
+          occurrenceEnd,
+          notes: linkedNotes,
+          text,
+          ...(imageDataUrl ? { imageDataUrl } : {}),
+        });
+        updateProofState((state) => ({
+          ...state,
+          submissions: [...state.submissions, {
+            id: crypto.randomUUID(),
+            occurrenceKey: key,
+            submittedAt: new Date().toISOString(),
+            text,
+            ...(imageDataUrl ? { imageDataUrl } : {}),
+            accepted: verdict.accepted,
+            reason: verdict.reason,
+          }],
+        }));
+        return verdict;
+      },
+    };
   };
 
   const quickCreate = () => {
@@ -851,6 +982,7 @@ const App: React.FC = () => {
           <EventModal
             draft={draft}
             availableNotes={notes}
+            proof={buildProofProps(draft)}
             onSave={saveDraft}
             onDelete={deleteEvent}
             onClose={() => setDraft(null)}
@@ -870,7 +1002,17 @@ const App: React.FC = () => {
             onClose={() => setSettingsOpen(false)}
             onLogout={handleLogout}
             onUserUpdated={setCurrentUser}
+            proofSettings={proofState.settings}
+            burns={proofState.burns}
+            onProofSettingsChange={(settings) => updateProofState((state) => ({ ...state, settings }))}
           />
+        )}
+        {burnNotice && (
+          <div className="burn-toast" role="status">
+            <strong>Missed proof: {burnNotice.eventTitle}</strong>
+            <span>{burnNotice.note}</span>
+            <button type="button" className="icon-btn small" onClick={() => setBurnNotice(null)} aria-label="Dismiss">×</button>
+          </div>
         )}
         {plannerDraft && (
           <div className="planner-modal-backdrop" onClick={() => setPlannerDraft(null)}>

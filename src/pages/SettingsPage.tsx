@@ -1,15 +1,44 @@
 import React, { useEffect, useState } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import authService, { User } from '../services/authService';
+import {
+  ANTHROPIC_MODEL,
+  GOOGLE_MODEL,
+  tokensBurnedThisMonth,
+  verifyApiKey,
+  type BurnRecord,
+  type ProofSettings,
+} from '../services/proofService';
 
 interface SettingsPageProps {
   currentUser: User | null;
   onClose: () => void;
   onLogout: () => void;
   onUserUpdated: (user: User) => void;
+  proofSettings: ProofSettings;
+  burns: BurnRecord[];
+  onProofSettingsChange: (settings: ProofSettings) => void;
 }
 
-const SettingsPage: React.FC<SettingsPageProps> = ({ currentUser, onClose, onLogout, onUserUpdated }) => {
+const PROVIDER_LABELS: Record<string, string> = {
+  test: 'Test key (no network calls)',
+  anthropic: `Anthropic · ${ANTHROPIC_MODEL}`,
+  google: `Google · ${GOOGLE_MODEL}`,
+};
+
+function maskKey(key: string): string {
+  return key.length <= 8 ? key : `${key.slice(0, 6)}…${key.slice(-4)}`;
+}
+
+const SettingsPage: React.FC<SettingsPageProps> = ({
+  currentUser,
+  onClose,
+  onLogout,
+  onUserUpdated,
+  proofSettings,
+  burns,
+  onProofSettingsChange,
+}) => {
   const { theme, toggleTheme } = useTheme();
   const [username, setUsername] = useState(currentUser?.username ?? '');
   const [email, setEmail] = useState(currentUser?.email ?? '');
@@ -21,6 +50,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ currentUser, onClose, onLog
   const [notice, setNotice] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [verifyingKey, setVerifyingKey] = useState(false);
 
   useEffect(() => {
     setUsername(currentUser?.username ?? '');
@@ -82,6 +113,43 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ currentUser, onClose, onLog
     setNotice('Password updated.');
   };
 
+  const verifyAndSaveKey = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError('');
+    setNotice('');
+    setVerifyingKey(true);
+    const result = await verifyApiKey(apiKeyInput);
+    setVerifyingKey(false);
+
+    if (!result.ok || !result.provider) {
+      setError(result.error ?? 'Could not verify that key.');
+      return;
+    }
+
+    onProofSettingsChange({
+      ...proofSettings,
+      apiKey: apiKeyInput.trim(),
+      provider: result.provider,
+      verifiedAt: new Date().toISOString(),
+    });
+    setApiKeyInput('');
+    setNotice(result.provider === 'test' ? 'Test key saved. Proof checks and burns are simulated.' : 'API key verified and saved.');
+  };
+
+  const removeKey = () => {
+    onProofSettingsChange({ ...proofSettings, apiKey: null, provider: null, verifiedAt: null, realBurnEnabled: false });
+    setNotice('API key removed.');
+  };
+
+  const updateNumber = (field: 'graceHours' | 'burnTokensPerMiss' | 'monthlyBurnCap', value: string) => {
+    const parsed = Math.max(0, Math.floor(Number(value) || 0));
+    onProofSettingsChange({ ...proofSettings, [field]: parsed });
+  };
+
+  const isRealKey = Boolean(proofSettings.verifiedAt && proofSettings.provider && proofSettings.provider !== 'test');
+  const burnedThisMonth = tokensBurnedThisMonth(burns);
+  const recentBurns = [...burns].reverse().slice(0, 5);
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="settings-panel" onClick={(event) => event.stopPropagation()}>
@@ -136,6 +204,73 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ currentUser, onClose, onLog
             </form>
           </>
         )}
+
+        <div className="settings-section settings-form">
+          <h3>Proof checking</h3>
+          {proofSettings.verifiedAt && proofSettings.apiKey && proofSettings.provider ? (
+            <div className="settings-row">
+              <span>
+                {PROVIDER_LABELS[proofSettings.provider]}
+                <br />
+                <small>{maskKey(proofSettings.apiKey)} · verified {new Date(proofSettings.verifiedAt).toLocaleDateString()}</small>
+              </span>
+              <button type="button" className="text-btn danger" onClick={removeKey}>Remove</button>
+            </div>
+          ) : (
+            <form onSubmit={verifyAndSaveKey}>
+              <label>
+                <span>AI API key (Anthropic or Google). Enter "test" to try it without a key.</span>
+                <input
+                  type="password"
+                  value={apiKeyInput}
+                  onChange={(event) => setApiKeyInput(event.target.value)}
+                  placeholder="sk-ant-…, AIza…, or test"
+                  autoComplete="off"
+                  required
+                />
+              </label>
+              <button type="submit" className="settings-save-btn" disabled={verifyingKey || !apiKeyInput.trim()}>
+                {verifyingKey ? 'Verifying...' : 'Verify and save'}
+              </button>
+            </form>
+          )}
+
+          <label>
+            <span>Hours after an event ends to submit proof</span>
+            <input type="number" min={0} value={proofSettings.graceHours} onChange={(event) => updateNumber('graceHours', event.target.value)} />
+          </label>
+          <label>
+            <span>Tokens burned per missed proof</span>
+            <input type="number" min={0} step={1000} value={proofSettings.burnTokensPerMiss} onChange={(event) => updateNumber('burnTokensPerMiss', event.target.value)} />
+          </label>
+          <label>
+            <span>Monthly burn cap (tokens)</span>
+            <input type="number" min={0} step={1000} value={proofSettings.monthlyBurnCap} onChange={(event) => updateNumber('monthlyBurnCap', event.target.value)} />
+          </label>
+          <label className="settings-checkbox">
+            <input
+              type="checkbox"
+              checked={proofSettings.realBurnEnabled}
+              disabled={!isRealKey}
+              onChange={(event) => onProofSettingsChange({ ...proofSettings, realBurnEnabled: event.target.checked })}
+            />
+            <span>Really burn tokens on my key (charges my provider account). Off means burns are only logged.</span>
+          </label>
+
+          <div className="settings-row">
+            <span>Burned this month</span>
+            <strong>{burnedThisMonth.toLocaleString()} / {proofSettings.monthlyBurnCap.toLocaleString()}</strong>
+          </div>
+          {recentBurns.length > 0 && (
+            <ul className="burn-log">
+              {recentBurns.map((burn) => (
+                <li key={burn.id}>
+                  <strong>{burn.eventTitle}</strong> · {new Date(burn.at).toLocaleString()} · {burn.note}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         <div className="settings-section">
           <h3>Appearance</h3>
