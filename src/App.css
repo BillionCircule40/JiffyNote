@@ -2152,7 +2152,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .burn-toast strong { grid-column: 1; }
 .burn-toast span { grid-column: 1; font-size: 13px; color: var(--text-muted); }
-.burn-toast button { grid-column: 2; grid-row: 1 / span 2; }
+.burn-toast .icon-btn { grid-column: 2; grid-row: 1 / span 2; }
+.burn-toast .burn-toast-stop { grid-column: 1; justify-self: start; padding-left: 0; }
 
 /* ===== Missed event video windows ===== */
 .video-blocked-notice {
@@ -2166,9 +2167,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 /* ===== Rave background ===== */
 @keyframes rave-bg { from { background-position: 0% 50%; } to { background-position: 400% 50%; } }
-body {
+/* Turned on by App when an event's proof deadline is missed. */
+body.rave-mode {
   background: linear-gradient(90deg, #ff0040, #ff8c00, #ffee00, #00ff6a, #00c8ff, #7a00ff, #ff00c8, #ff0040);
   background-size: 400% 100%;
   animation: rave-bg 8s linear infinite;
 }
-@media (prefers-reduced-motion: reduce) { body { animation: none; } }
+@media (prefers-reduced-motion: reduce) { body.rave-mode { animation: none; } }

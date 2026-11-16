@@ -174,6 +174,7 @@ const App: React.FC = () => {
   });
   const [burnNotice, setBurnNotice] = useState<BurnRecord | null>(null);
   const [blockedVideoIds, setBlockedVideoIds] = useState<string[]>([]);
+  const [raveActive, setRaveActive] = useState(false);
   const showMissedVideos = (ids: string[] = MISSED_EVENT_VIDEO_IDS) => setBlockedVideoIds(openMissedVideoWindows(ids));
   const proofState = proofStore.state;
   const eventsRef = useRef(events);
@@ -212,6 +213,7 @@ const App: React.FC = () => {
             ? { ...current, state: { ...current.state, burns: [...current.state.burns, record] } }
             : current);
           setBurnNotice(record);
+          setRaveActive(true);
           setBlockedVideoIds(openMissedVideoWindows(MISSED_EVENT_VIDEO_IDS));
         }
       } finally {
@@ -228,10 +230,16 @@ const App: React.FC = () => {
   }, [currentUser?.id]);
 
   useEffect(() => {
-    if (!burnNotice) return;
+    document.body.classList.toggle('rave-mode', raveActive);
+    return () => document.body.classList.remove('rave-mode');
+  }, [raveActive]);
+
+  useEffect(() => {
+    // The notice holds the "Stop the rave" button, so it stays up while the rave is on.
+    if (!burnNotice || raveActive) return;
     const timer = window.setTimeout(() => setBurnNotice(null), 10000);
     return () => window.clearTimeout(timer);
-  }, [burnNotice]);
+  }, [burnNotice, raveActive]);
 
   useEffect(() => saveEvents(events, currentUser?.id), [events, currentUser?.id]);
   useEffect(() => saveNotes(notes, currentUser?.id), [notes, currentUser?.id]);
@@ -1038,6 +1046,7 @@ const App: React.FC = () => {
               updateProofState((state) => ({ ...state, burns: [...state.burns, record] }));
               setBurnNotice(record);
               setSettingsOpen(false);
+              setRaveActive(true);
               showMissedVideos();
             }}
           />
@@ -1056,7 +1065,20 @@ const App: React.FC = () => {
           <div className="burn-toast" role="status">
             <strong>Missed proof: {burnNotice.eventTitle}</strong>
             <span>{burnNotice.note}</span>
-            <button type="button" className="icon-btn small" onClick={() => setBurnNotice(null)} aria-label="Dismiss">×</button>
+            {raveActive && (
+              <button type="button" className="text-btn burn-toast-stop" onClick={() => setRaveActive(false)}>Stop the rave</button>
+            )}
+            <button
+              type="button"
+              className="icon-btn small"
+              onClick={() => {
+                setRaveActive(false);
+                setBurnNotice(null);
+              }}
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
           </div>
         )}
         {plannerDraft && (
