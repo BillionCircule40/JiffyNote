@@ -35,8 +35,10 @@ import {
 } from './services/proofService';
 
 const PROOF_ENFORCEMENT_INTERVAL_MS = 60 * 1000;
-// Played whenever an event's proof deadline is missed.
-const MISSED_EVENT_VIDEO_ID = 'rhW7Ts1wDEY';
+// Played back to back whenever an event's proof deadline is missed.
+const MISSED_EVENT_VIDEO_IDS = ['rhW7Ts1wDEY', 'q88agSZnvng'];
+// YouTube plays the video in the path first, then each id in `playlist`.
+const MISSED_EVENT_VIDEO_URL = `https://www.youtube.com/embed/${MISSED_EVENT_VIDEO_IDS[0]}?autoplay=1&playlist=${MISSED_EVENT_VIDEO_IDS.slice(1).join(',')}`;
 
 const STORAGE_KEY = 'jiffynote.events';
 const NOTES_STORAGE_KEY = 'jiffynote.notes';
@@ -1036,7 +1038,7 @@ const App: React.FC = () => {
               </div>
               <div className="missed-video-frame">
                 <iframe
-                  src={`https://www.youtube.com/embed/${MISSED_EVENT_VIDEO_ID}?autoplay=1`}
+                  src={MISSED_EVENT_VIDEO_URL}
                   title="Missed event video"
                   allow="autoplay; encrypted-media; picture-in-picture"
                   allowFullScreen
