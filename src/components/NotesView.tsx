@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { Note } from '../App';
 import NoteSection from './NoteSection';
+import { searchNotes, SearchFilters } from '../services/searchService';
 
 interface NotesViewProps {
   notes: Note[];
   onCreateNote: () => void;
   onEditNote: (id: string) => void;
   onDeleteNote: (id: string) => void;
+  onAttachNote?: ((noteId: string) => void) | undefined;
   onDragStart: (noteId: string) => void;
   onDragOver: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent, sectionId: 'now' | 'later' | 'todo' | 'general') => void;
@@ -35,6 +37,7 @@ const NotesView: React.FC<NotesViewProps> = ({
   notes, 
   onEditNote, 
   onDeleteNote,
+  onAttachNote,
   onDragStart,
   onDragOver,
   onDrop
@@ -42,6 +45,10 @@ const NotesView: React.FC<NotesViewProps> = ({
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'now' | 'later' | 'todo' | 'general'>('all');
   const [priorityNotesExpanded, setPriorityNotesExpanded] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isDragOverGeneral, setIsDragOverGeneral] = useState(false);
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
+  const [showDateFilters, setShowDateFilters] = useState(false);
 
 
   // Handle delete for general notes (inline)
@@ -54,11 +61,22 @@ const NotesView: React.FC<NotesViewProps> = ({
   // Check if any section has notes
   const hasNotes = notes.length > 0;
 
-  // Search functionality
-  const filteredNotes = notes.filter(note => 
-    note.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    note.content.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Search functionality using searchService
+  const searchFilters: SearchFilters = {
+    query: searchQuery,
+    section: selectedFilter
+  };
+
+  // Parse date range if provided
+  if (dateFrom) {
+    searchFilters.dateFrom = new Date(dateFrom);
+  }
+  if (dateTo) {
+    // Add 24 hours to include the entire end date
+    searchFilters.dateTo = new Date(new Date(dateTo).getTime() + 24 * 60 * 60 * 1000 - 1);
+  }
+
+  const filteredNotes = searchNotes(notes, searchFilters);
 
   // Calculate note counts for each section (filtered)
   const noteCounts = {
@@ -83,6 +101,58 @@ const NotesView: React.FC<NotesViewProps> = ({
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
       />
+
+      <div className="date-range-menu">
+        <button
+          className="date-range-toggle"
+          type="button"
+          aria-expanded={showDateFilters}
+          aria-controls="notes-date-range-filters"
+          onClick={() => setShowDateFilters((isOpen) => !isOpen)}
+        >
+          <span>Date filters{dateFrom || dateTo ? ' (active)' : ''}</span>
+          <span className={`date-range-chevron${showDateFilters ? ' expanded' : ''}`} aria-hidden="true">▾</span>
+        </button>
+        <div
+          id="notes-date-range-filters"
+          className={`date-range-submenu${showDateFilters ? ' open' : ''}`}
+          aria-hidden={!showDateFilters}
+        >
+          <div className="date-range-filters">
+            <label className="date-filter-field">
+              <span>From</span>
+              <input
+                type="date"
+                className="date-filter"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                tabIndex={showDateFilters ? 0 : -1}
+              />
+            </label>
+            <label className="date-filter-field">
+              <span>To</span>
+              <input
+                type="date"
+                className="date-filter"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                tabIndex={showDateFilters ? 0 : -1}
+              />
+            </label>
+            {(dateFrom || dateTo) && (
+              <button
+                className="clear-date-btn"
+                type="button"
+                onClick={() => { setDateFrom(''); setDateTo(''); }}
+                aria-label="Clear date filters"
+                tabIndex={showDateFilters ? 0 : -1}
+              >
+                ×
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Section Filter Controls */}
       <div className="section-filters">
@@ -144,6 +214,7 @@ const NotesView: React.FC<NotesViewProps> = ({
               notes={getSectionNotes(section.id)}
               onEditNote={onEditNote}
               onDeleteNote={onDeleteNote}
+              onAttachNote={onAttachNote}
               onDragStart={onDragStart}
               onDragOver={onDragOver}
               onDrop={onDrop}
@@ -155,7 +226,19 @@ const NotesView: React.FC<NotesViewProps> = ({
       {/* Notes Section */}
       <div className="general-notes-section">
         <h3 className="section-category-title">Notes</h3>
-        <div className="general-notes-grid">
+        <div 
+          className={`general-notes-grid ${isDragOverGeneral ? 'drag-over' : ''}`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragOverGeneral(true);
+            onDragOver(e);
+          }}
+          onDragLeave={() => setIsDragOverGeneral(false)}
+          onDrop={(e) => {
+            setIsDragOverGeneral(false);
+            onDrop(e, 'general');
+          }}
+        >
           {getSectionNotes('general')
             .map((note) => (
               <div
@@ -171,15 +254,27 @@ const NotesView: React.FC<NotesViewProps> = ({
                   <span className="note-card-date">
                     {new Date(note.updated_at).toLocaleDateString()}
                   </span>
-                  <button
-                    className="delete-note-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteNote(note.id);
-                    }}
-                  >
-                    ×
-                  </button>
+                  <div className="note-card-actions">
+                    <button
+                      className="attach-note-btn"
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAttachNote?.(note.id);
+                      }}
+                    >
+                      Attach
+                    </button>
+                    <button
+                      className="delete-note-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteNote(note.id);
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

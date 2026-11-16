@@ -8,6 +8,7 @@ interface NoteSectionProps {
   notes: Note[];
   onEditNote: (id: string) => void;
   onDeleteNote: (id: string) => void;
+  onAttachNote?: ((noteId: string) => void) | undefined;
   onDragStart: (noteId: string) => void;
   onDragOver: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent, sectionId: 'now' | 'later' | 'todo' | 'general') => void;
@@ -20,6 +21,7 @@ const NoteSection: React.FC<NoteSectionProps> = ({
   notes, 
   onEditNote, 
   onDeleteNote,
+  onAttachNote,
   onDragStart,
   onDragOver,
   onDrop
@@ -92,15 +94,27 @@ const NoteSection: React.FC<NoteSectionProps> = ({
                 <span className="note-card-date">
                   {new Date(note.updated_at).toLocaleDateString()}
                 </span>
-                <button
-                  className="delete-note-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteNote(note.id);
-                  }}
-                >
-                  ×
-                </button>
+                <div className="note-card-actions">
+                  <button
+                    className="attach-note-btn"
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onAttachNote?.(note.id);
+                    }}
+                  >
+                    Attach
+                  </button>
+                  <button
+                    className="delete-note-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteNote(note.id);
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
             </div>
           ))
